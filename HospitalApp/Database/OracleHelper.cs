@@ -1,0 +1,147 @@
+using Oracle.ManagedDataAccess.Client;
+using System.Data;
+using System.Text.RegularExpressions;
+
+namespace HospitalApp.Database;
+
+/// <summary>
+/// Oracle DB helper – mỗi instance giữ 1 connection string (1 Oracle user).
+/// VPD/RBAC áp dụng tự động theo user đang kết nối.
+/// </summary>
+public class OracleHelper
+{
+    private readonly string _connStr;
+
+    public string Username { get; }
+    public string Host     { get; }
+    public string Port     { get; }
+    public string Sid      { get; }
+
+    public OracleHelper(string host, string port, string sid, string username, string password)
+    {
+        Host     = host;
+        Port     = port;
+        Sid      = sid;
+        Username = username.ToUpper();
+
+        _connStr = $"Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)" +
+                   $"(HOST={host})(PORT={port}))(CONNECT_DATA=(SID={sid})));" +
+                   $"User Id={username};Password={password};Connection Timeout=10;";
+    }
+
+    // ── Kết nối + test ────────────────────────────────────────────────────────
+    public void TestConnection()
+    {
+        using var conn = new OracleConnection(_connStr);
+        conn.Open();
+    }
+
+    public OracleConnection OpenConnection()
+    {
+        var conn = new OracleConnection(_connStr);
+        conn.Open();
+        return conn;
+    }
+
+    // ── Query trả DataTable ───────────────────────────────────────────────────
+    public DataTable Query(string sql, params OracleParameter[] parms)
+    {
+        using var conn = new OracleConnection(_connStr);
+        conn.Open();
+        using var cmd  = new OracleCommand(sql, conn);
+        if (parms.Length > 0) cmd.Parameters.AddRange(parms);
+        using var da = new OracleDataAdapter(cmd);
+        var dt = new DataTable();
+        da.Fill(dt);
+        return dt;
+    }
+
+    // ── Query trả scalar ──────────────────────────────────────────────────────
+    public object? Scalar(string sql, params OracleParameter[] parms)
+    {
+        using var conn = new OracleConnection(_connStr);
+        conn.Open();
+        using var cmd  = new OracleCommand(sql, conn);
+        if (parms.Length > 0) cmd.Parameters.AddRange(parms);
+        return cmd.ExecuteScalar();
+    }
+
+    // ── Thực thi DML/DDL ─────────────────────────────────────────────────────
+    public int Execute(string sql, params OracleParameter[] parms)
+    {
+        using var conn = new OracleConnection(_connStr);
+        conn.Open();
+        using var cmd  = new OracleCommand(sql, conn);
+        if (parms.Length > 0) cmd.Parameters.AddRange(parms);
+        return cmd.ExecuteNonQuery();
+    }
+
+    // ── Thực thi nhiều lệnh DDL trong 1 transaction ───────────────────────────
+    public void ExecuteBatch(IEnumerable<string> statements)
+    {
+        using var conn = new OracleConnection(_connStr);
+        conn.Open();
+        using var tx  = conn.BeginTransaction();
+        try
+        {
+            foreach (var sql in statements)
+            {
+                if (string.IsNullOrWhiteSpace(sql)) continue;
+                using var cmd = new OracleCommand(sql, conn) { Transaction = tx };
+                cmd.ExecuteNonQuery();
+            }
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+    }
+
+    // ── Kiểm tra DBA privilege ────────────────────────────────────────────────
+    public bool IsDba()
+    {
+        try
+        {
+            var result = Scalar(
+                "SELECT COUNT(*) FROM SESSION_PRIVS WHERE PRIVILEGE = 'DBA'");
+            return Convert.ToInt32(result) > 0;
+        }
+        catch { return false; }
+    }
+
+    // ── Lấy vai trò của user hiện tại trong hệ thống bệnh viện ───────────────
+    public string GetHospitalRole()
+    {
+        try
+        {
+            var dt = Query(
+                "SELECT VAITRO FROM BVADMIN.NHANVIEN " +
+                "WHERE ORACLE_USER = SYS_CONTEXT('USERENV','SESSION_USER')");
+            if (dt.Rows.Count > 0) return dt.Rows[0][0].ToString()!;
+
+            // Kiểm tra bệnh nhân
+            var bnCount = Convert.ToInt32(
+                Scalar("SELECT COUNT(*) FROM BVADMIN.BENHNHAN " +
+                       "WHERE ORACLE_USER = SYS_CONTEXT('USERENV','SESSION_USER')"));
+            if (bnCount > 0) return "BN";
+        }
+        catch { /* ignore */ }
+        return IsDba() ? "DBA" : "UNKNOWN";
+    }
+
+    // ── Validate identifier an toàn (chống SQL injection trong DDL) ───────────
+    public static string SafeIdentifier(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Tên không được để trống.");
+        if (!Regex.IsMatch(name, @"^[A-Za-z][A-Za-z0-9_$#]{0,29}$"))
+            throw new ArgumentException($"Tên '{name}' không hợp lệ (chỉ chữ/số/_ , bắt đầu bằng chữ, tối đa 30 ký tự).");
+        return name.ToUpper();
+    }
+
+    // ── OracleParameter helpers ────────────────────────────────────────────────
+    public static OracleParameter Param(string name, object? value)
+        => new(name, value ?? DBNull.Value);
+}
