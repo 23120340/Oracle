@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 -- PHÂN HỆ 2 - File 07: Yêu cầu 4 - Sao lưu và Phục hồi Dữ liệu
 -- ============================================================
 -- 1. Tìm hiểu các phương pháp sao lưu/phục hồi
@@ -94,7 +94,7 @@ BEGIN
         start_date      => SYSTIMESTAMP,
         repeat_interval => 'FREQ=DAILY; BYHOUR=2; BYMINUTE=0',  -- 2:00 AM mỗi ngày
         enabled         => FALSE,
-        comments        => 'Full RMAN backup hàng đêm 2:00 AM'
+        comments        => N'Full RMAN backup hàng đêm 2:00 AM'
     );
 
     DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('JOB_RMAN_FULL_BACKUP', 1, 'TARGET');
@@ -183,7 +183,7 @@ ALTER SYSTEM SET DB_RECOVERY_FILE_DEST_SIZE = 20G;
 ALTER SYSTEM SET DB_RECOVERY_FILE_DEST = 'C:\oracle\fra';
 
 -- C3. Bật Flashback trên bảng cụ thể (Row Movement cần được bật)
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 ALTER TABLE DONTHUOC    ENABLE ROW MOVEMENT;
 ALTER TABLE HSBA        ENABLE ROW MOVEMENT;
 ALTER TABLE HSBA_DV     ENABLE ROW MOVEMENT;
@@ -202,7 +202,7 @@ CREATE TABLE BVADMIN.CHECKPOINT_LOG (
 );
 
 -- Ghi checkpoint định kỳ (ví dụ: trước các thao tác quan trọng)
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 INSERT INTO CHECKPOINT_LOG(EVENT_NAME, SCN)
 VALUES('Before_batch_update', DBMS_FLASHBACK.GET_SYSTEM_CHANGE_NUMBER());
 COMMIT;
@@ -218,7 +218,7 @@ CONNECT SYS/password AS SYSDBA;
 --   TO_TIMESTAMP('2025-05-01 07:30:00', 'YYYY-MM-DD HH24:MI:SS');
 
 -- C6. Flashback Query: Xem dữ liệu tại thời điểm trước sự cố (không cần phục hồi toàn bộ)
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 
 -- Xem DONTHUOC tại thời điểm trước khi bị sửa
 SELECT * FROM DONTHUOC

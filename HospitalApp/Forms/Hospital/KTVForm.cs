@@ -1,4 +1,7 @@
+using HospitalApp.Controls;
 using HospitalApp.Database;
+using HospitalApp.Security;
+using HospitalApp.Theme;
 using Oracle.ManagedDataAccess.Client;
 
 namespace HospitalApp.Forms.Hospital;
@@ -10,10 +13,12 @@ namespace HospitalApp.Forms.Hospital;
 public class KTVForm : Form
 {
     private readonly OracleHelper _db;
+    private readonly SessionManager _session;
     private DataGridView _dgvDV   = null!;
     private TextBox      _txtKQ   = null!;
     private Label        _lblInfo = null!;
     private Button       _btnSave = null!, _btnRefresh = null!;
+    private TabControl   _tabs    = null!;
 
     public KTVForm(OracleHelper db)
     {
@@ -23,19 +28,160 @@ public class KTVForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = Color.FromArgb(245, 252, 245);
         BuildUI();
+
+        ShortcutHelper.WireStandard(this,
+            onRefresh: LoadMyDV,
+            onSave:    () => BtnSave_Click(null, EventArgs.Empty));
+
+        _session = new SessionManager(this, db.Username);
+        FormClosed += (_, _) => _session.Dispose();
     }
 
     private void BuildUI()
     {
-        // Header
-        var header = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = Color.FromArgb(0, 140, 60) };
-        header.Controls.Add(new Label
+        Size = new Size(1180, 720);
+        MinimumSize = new Size(1000, 600);
+        BackColor = UiTheme.BgLight;
+
+        _tabs = new TabControl
         {
-            Text = "🔬  Phân hệ 2 – Kỹ thuật viên",
-            Dock = DockStyle.Fill, ForeColor = Color.White,
-            Font = new Font("Segoe UI", 13, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter
-        });
+            Dock = DockStyle.Fill, Font = UiTheme.Body(),
+            Appearance = TabAppearance.FlatButtons,
+            SizeMode = TabSizeMode.Fixed,
+            ItemSize = new Size(0, 1)
+        };
+        _tabs.TabPages.Add(BuildWorkTab());
+        _tabs.TabPages.Add(BuildThongBaoTab());
+        _tabs.TabPages.Add(BuildMyProfileTab());
+
+        var header = BuildAppHeader("Kỹ thuật viên", "KTV", UiTheme.HealthGreen);
+
+        var sidebar = new Sidebar { AccentColor = UiTheme.HealthGreen, Dock = DockStyle.Left };
+        sidebar.AddBrand("HospitalApp", _db.Username);
+        sidebar.AddSection("Công việc");
+        sidebar.AddItem("work",    IconRegistry.Lab,    "Dịch vụ của tôi");
+        sidebar.AddSection("Thông tin");
+        sidebar.AddItem("tb",      IconRegistry.Bell,   "Thông báo");
+        sidebar.AddItem("profile", IconRegistry.Person, "Thông tin của tôi");
+        sidebar.ItemSelected += key =>
+        {
+            _tabs.SelectedIndex = key switch
+            { "work" => 0, "tb" => 1, "profile" => 2, _ => 0 };
+        };
+
+        var status = new StatusBar
+        {
+            LeftText   = $"{IconRegistry.Database}  {_db.Host}:{_db.Port}/{_db.Sid}",
+            CenterText = $"{_db.Username}  ·  Kỹ thuật viên  ·  {IconRegistry.Shield} RBAC view"
+        };
+
+        Controls.Add(_tabs);
         Controls.Add(header);
+        Controls.Add(sidebar);
+        Controls.Add(status);
+
+        sidebar.SelectByKey("work");
+        LoadMyDV();
+    }
+
+    private Panel BuildAppHeader(string title, string roleLabel, Color roleColor)
+    {
+        var header = new Panel
+        {
+            Dock = DockStyle.Top, Height = 60,
+            BackColor = UiTheme.Surface,
+            Padding = new Padding(24, 12, 24, 12)
+        };
+        var lblTitle = new Label
+        {
+            Text = title, Dock = DockStyle.Left, Width = 300,
+            Font = UiTheme.Heading2(), ForeColor = UiTheme.TextDark,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        var roleChip = new RoleChip
+        {
+            Text = roleLabel, AccentColor = roleColor,
+            Anchor = AnchorStyles.Right | AnchorStyles.Top
+        };
+        var btnLogout = new RoundedButton
+        {
+            Text = "Đăng xuất", Glyph = IconRegistry.SignOut,
+            BackColor = UiTheme.BgLight, ForeColor = UiTheme.TextDark,
+            GlyphColor = UiTheme.Danger,
+            Width = 130, Height = 36,
+            Anchor = AnchorStyles.Right | AnchorStyles.Top
+        };
+        btnLogout.Click += (_, _) =>
+        {
+            if (MessageBox.Show("Đăng xuất?", "Xác nhận",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                Close();
+        };
+        void layout()
+        {
+            btnLogout.Location = new Point(header.Width - btnLogout.Width - 16, 12);
+            roleChip.Location  = new Point(btnLogout.Left - roleChip.Width - 12, 17);
+        }
+        header.Resize += (_, _) => layout();
+        roleChip.HandleCreated += (_, _) => layout();
+        header.Controls.Add(roleChip);
+        header.Controls.Add(btnLogout);
+        header.Controls.Add(lblTitle);
+        layout();
+        return header;
+    }
+
+    private TabPage BuildMyProfileTab()
+    {
+        var p = new TabPage("👤 Thông tin của tôi");
+        p.Controls.Add(new MyProfilePanel(_db));
+        return p;
+    }
+
+    private TabPage BuildThongBaoTab()
+    {
+        var page = new TabPage("📢 Thông báo");
+        var lblLabel = new Label
+        {
+            Dock = DockStyle.Top,
+            Height = 28,
+            Padding = new Padding(8, 6, 0, 0),
+            Font = UiTheme.LabelBold(),
+            ForeColor = Color.FromArgb(0, 90, 40),
+            Text = "Nhãn OLS: (chưa tải)"
+        };
+        var dgv = new DataGridView
+        {
+            Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            BackgroundColor = Color.White, RowHeadersVisible = false,
+            Font = UiTheme.Body()
+        };
+        var btn = new Button
+        {
+            Text = "🔄 Tải thông báo", Dock = DockStyle.Top, Height = 34,
+            BackColor = Color.SteelBlue, ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat, Font = UiTheme.Body(), Cursor = Cursors.Hand
+        };
+        btn.Click += (_, _) => TryCatch(() =>
+        {
+            lblLabel.Text = "Nhãn OLS: " + CurrentOlsLabel();
+            dgv.DataSource = _db.Query(
+                "SELECT MATB, SUBSTR(TO_CHAR(NOIDUNG),1,100) AS NOIDUNG, " +
+                "TO_CHAR(NGAYGIO,'DD/MM/YYYY HH24:MI') AS NGAYGIO, DIADIEM " +
+                "FROM BVADMIN.THONGBAO ORDER BY NGAYGIO DESC");
+        });
+
+        page.Controls.Add(dgv);
+        page.Controls.Add(lblLabel);
+        page.Controls.Add(btn);
+        return page;
+    }
+
+    private TabPage BuildWorkTab()
+    {
+        var page = new TabPage("🔬 Dịch vụ của tôi");
 
         // Toolbar
         var tool = new FlowLayoutPanel
@@ -48,7 +194,7 @@ public class KTVForm : Form
         {
             Text = "🔄 Tải danh sách DV của tôi", Width = 220, Height = 32,
             BackColor = Color.SteelBlue, ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9), Cursor = Cursors.Hand
+            FlatStyle = FlatStyle.Flat, Font = UiTheme.Body(), Cursor = Cursors.Hand
         };
         _btnRefresh.Click += (_, _) => LoadMyDV();
         tool.Controls.Add(_btnRefresh);
@@ -56,22 +202,9 @@ public class KTVForm : Form
         _lblInfo = new Label
         {
             AutoSize = true, ForeColor = Color.DimGray,
-            Font = new Font("Segoe UI", 9), Padding = new Padding(10, 8, 0, 0)
+            Font = UiTheme.Body(), Padding = new Padding(10, 8, 0, 0)
         };
         tool.Controls.Add(_lblInfo);
-        Controls.Add(tool);
-
-        // Grid
-        _dgvDV = new DataGridView
-        {
-            Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells,
-            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-            BackgroundColor = Color.White, RowHeadersVisible = false,
-            Font = new Font("Segoe UI", 9)
-        };
-        _dgvDV.SelectionChanged += DgvDV_SelectionChanged;
-        Controls.Add(_dgvDV);
 
         // Bottom: cập nhật kết quả
         var bottom = new Panel
@@ -83,12 +216,12 @@ public class KTVForm : Form
         bottom.Controls.Add(new Label
         {
             Text = "Kết quả xét nghiệm/dịch vụ:", Dock = DockStyle.Top,
-            Font = new Font("Segoe UI", 9, FontStyle.Bold), Height = 22
+            Font = UiTheme.LabelBold(), Height = 22
         });
         _txtKQ = new TextBox
         {
             Dock = DockStyle.Fill, Multiline = true, ScrollBars = ScrollBars.Vertical,
-            Font = new Font("Segoe UI", 9), BorderStyle = BorderStyle.FixedSingle
+            Font = UiTheme.Body(), BorderStyle = BorderStyle.FixedSingle
         };
         bottom.Controls.Add(_txtKQ);
 
@@ -97,13 +230,26 @@ public class KTVForm : Form
             Dock = DockStyle.Bottom, Text = "💾  Lưu Kết quả",
             Height = 36, BackColor = Color.FromArgb(0, 140, 60),
             ForeColor = Color.White, FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 10, FontStyle.Bold), Cursor = Cursors.Hand
+            Font = UiTheme.Button(10f), Cursor = Cursors.Hand
         };
         _btnSave.Click += BtnSave_Click;
         bottom.Controls.Add(_btnSave);
-        Controls.Add(bottom);
 
-        LoadMyDV();
+        // Grid (Fill — phải add cuối cùng để chiếm phần còn lại)
+        _dgvDV = new DataGridView
+        {
+            Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            BackgroundColor = Color.White, RowHeadersVisible = false,
+            Font = UiTheme.Body()
+        };
+        _dgvDV.SelectionChanged += DgvDV_SelectionChanged;
+
+        page.Controls.Add(_dgvDV);
+        page.Controls.Add(bottom);
+        page.Controls.Add(tool);
+        return page;
     }
 
     private void LoadMyDV()
@@ -157,19 +303,21 @@ public class KTVForm : Form
                 OracleHelper.Param("h", mahsba),
                 OracleHelper.Param("l", loaidv));
 
-            ShowSuccess(
-                $"Đã lưu kết quả cho:\n" +
-                $"HSBA: {mahsba}\n" +
-                $"Dịch vụ: {loaidv}\n\n" +
-                $"(Trigger LOG_KTV_KETQUA đã ghi vết thay đổi này)");
+            AppAuditLogger.Info(_db.Username, "KTV.SaveKQ", $"hsba={mahsba} loaidv={loaidv}");
+            Toast.Show(this, $"Đã lưu kết quả cho {loaidv}", Toast.Kind.Success);
             LoadMyDV();
         });
     }
 
-    private static void TryCatch(Action a)
+    private void TryCatch(Action a, [System.Runtime.CompilerServices.CallerMemberName] string caller = "")
     {
         try { a(); }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        catch (Exception ex)
+        {
+            AppAuditLogger.Error(_db.Username, $"KTV.{caller}", ex.Message);
+            MessageBox.Show(OracleErrorMapper.Friendly(ex), "Lỗi",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     private static void ShowSuccess(string m) =>
@@ -177,4 +325,16 @@ public class KTVForm : Form
 
     private static void ShowError(string m) =>
         MessageBox.Show(m, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+    private string CurrentOlsLabel()
+    {
+        try
+        {
+            return _db.Scalar(
+                "SELECT NVL(MAX(LABEL), '(chưa gán)') " +
+                "FROM DBA_SA_USER_LABELS " +
+                "WHERE POLICY_NAME='BV_LABEL_POLICY' AND USER_NAME=USER")?.ToString() ?? "(chưa gán)";
+        }
+        catch { return "(không đọc được DBA_SA_USER_LABELS)"; }
+    }
 }

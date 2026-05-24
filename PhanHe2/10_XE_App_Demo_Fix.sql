@@ -1,0 +1,104 @@
+﻿-- ============================================================
+-- PHAN HE 2 - File 10: Oracle XE app-demo repair
+-- Chay sau 01-09 neu setup qua SYS/PDB lam account mapping bi trong.
+-- Muc tieu: dam bao login app Phan he 2 co user + role + ORACLE_USER.
+-- ============================================================
+
+CONNECT SYS/password AS SYSDBA;
+
+SET SERVEROUTPUT ON;
+
+DECLARE
+    PROCEDURE ensure_user(
+        p_username IN VARCHAR2,
+        p_password IN VARCHAR2
+    ) AS
+        v_count NUMBER;
+    BEGIN
+        SELECT COUNT(*) INTO v_count
+        FROM dba_users
+        WHERE username = UPPER(p_username);
+
+        IF v_count = 0 THEN
+            EXECUTE IMMEDIATE
+                'CREATE USER ' || p_username ||
+                ' IDENTIFIED BY "' || p_password || '"' ||
+                ' DEFAULT TABLESPACE USERS QUOTA 10M ON USERS';
+            DBMS_OUTPUT.PUT_LINE('Created user ' || p_username);
+        ELSE
+            EXECUTE IMMEDIATE
+                'ALTER USER ' || p_username || ' IDENTIFIED BY "' || p_password || '" ACCOUNT UNLOCK';
+            DBMS_OUTPUT.PUT_LINE('Updated user ' || p_username);
+        END IF;
+
+        EXECUTE IMMEDIATE 'GRANT CREATE SESSION TO ' || p_username;
+    END;
+BEGIN
+    ensure_user('DPV_NV001', 'BV@2025!');
+    ensure_user('DPV_NV002', 'BV@2025!');
+    ensure_user('BS_NV003',  'BV@2025!');
+    ensure_user('BS_NV004',  'BV@2025!');
+    ensure_user('BS_NV005',  'BV@2025!');
+    ensure_user('KTV_NV006', 'BV@2025!');
+    ensure_user('KTV_NV007', 'BV@2025!');
+    ensure_user('BN_BN001',  'BV@2025!');
+    ensure_user('BN_BN002',  'BV@2025!');
+    ensure_user('BN_BN003',  'BV@2025!');
+END;
+/
+
+UPDATE BVADMIN.NHANVIEN SET ORACLE_USER='DPV_NV001' WHERE MANV='NV001';
+UPDATE BVADMIN.NHANVIEN SET ORACLE_USER='DPV_NV002' WHERE MANV='NV002';
+UPDATE BVADMIN.NHANVIEN SET ORACLE_USER='BS_NV003'  WHERE MANV='NV003';
+UPDATE BVADMIN.NHANVIEN SET ORACLE_USER='BS_NV004'  WHERE MANV='NV004';
+UPDATE BVADMIN.NHANVIEN SET ORACLE_USER='BS_NV005'  WHERE MANV='NV005';
+UPDATE BVADMIN.NHANVIEN SET ORACLE_USER='KTV_NV006' WHERE MANV='NV006';
+UPDATE BVADMIN.NHANVIEN SET ORACLE_USER='KTV_NV007' WHERE MANV='NV007';
+
+UPDATE BVADMIN.BENHNHAN SET ORACLE_USER='BN_BN001' WHERE MABN='BN001';
+UPDATE BVADMIN.BENHNHAN SET ORACLE_USER='BN_BN002' WHERE MABN='BN002';
+UPDATE BVADMIN.BENHNHAN SET ORACLE_USER='BN_BN003' WHERE MABN='BN003';
+
+COMMIT;
+
+GRANT DPV_Role TO DPV_NV001;
+GRANT DPV_Role TO DPV_NV002;
+GRANT BS_Role TO BS_NV003;
+GRANT BS_Role TO BS_NV004;
+GRANT BS_Role TO BS_NV005;
+GRANT KTV_Role TO KTV_NV006;
+GRANT KTV_Role TO KTV_NV007;
+GRANT BenhNhan_Role TO BN_BN001;
+GRANT BenhNhan_Role TO BN_BN002;
+GRANT BenhNhan_Role TO BN_BN003;
+
+-- Quyen doc toi thieu de app nhan dien vai tro sau khi login.
+GRANT SELECT ON BVADMIN.NHANVIEN TO DPV_Role;
+GRANT SELECT ON BVADMIN.NHANVIEN TO BS_Role;
+GRANT SELECT ON BVADMIN.NHANVIEN TO KTV_Role;
+GRANT SELECT ON BVADMIN.BENHNHAN TO BenhNhan_Role;
+
+-- OLS cho user nhan vien, neu policy da san sang.
+BEGIN
+    LBACSYS.SA_USER_ADMIN.SET_USER_LABELS('BV_LABEL_POLICY', 'DPV_NV001', 'NV:HCM');
+    LBACSYS.SA_USER_ADMIN.SET_USER_LABELS('BV_LABEL_POLICY', 'DPV_NV002', 'NV:HNI');
+    LBACSYS.SA_USER_ADMIN.SET_USER_LABELS('BV_LABEL_POLICY', 'BS_NV003',  'LDK:HCM:TM');
+    LBACSYS.SA_USER_ADMIN.SET_USER_LABELS('BV_LABEL_POLICY', 'BS_NV004',  'LDK:HNI:TK');
+    LBACSYS.SA_USER_ADMIN.SET_USER_LABELS('BV_LABEL_POLICY', 'BS_NV005',  'LDK:HNI:TH');
+    LBACSYS.SA_USER_ADMIN.SET_USER_LABELS('BV_LABEL_POLICY', 'KTV_NV006', 'NV:HCM:TM');
+    LBACSYS.SA_USER_ADMIN.SET_USER_LABELS('BV_LABEL_POLICY', 'KTV_NV007', 'NV:HNI:TH');
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Skip OLS employee labels: ' || SQLERRM);
+END;
+/
+
+PROMPT === Verify NHANVIEN account mapping ===
+SELECT MANV, VAITRO, ORACLE_USER
+FROM BVADMIN.NHANVIEN
+ORDER BY MANV;
+
+PROMPT === Verify BENHNHAN account mapping ===
+SELECT MABN, ORACLE_USER
+FROM BVADMIN.BENHNHAN
+ORDER BY MABN;

@@ -11,6 +11,7 @@
 
 ```
 Oracle/
+├── HospitalApp/           ← Source WinForms C# (Phân hệ 1 + 2)
 ├── PhanHe2/               ← Script Oracle SQL (Phân hệ 2)
 │   ├── 01_schema_data.sql
 │   ├── 02_TC1_accounts.sql
@@ -18,21 +19,19 @@ Oracle/
 │   ├── 04_YC1_C3_VPD_DPV_BS.sql
 │   ├── 05_YC2_OLS_ThongBao.sql
 │   ├── 06_YC3_Audit.sql
-│   └── 07_YC4_Backup_Recovery.sql
-└── HospitalApp/           ← Ứng dụng WinForm C# (Phân hệ 1 + 2)
-    ├── HospitalApp.csproj
-    ├── Program.cs
-    ├── Database/
-    │   └── OracleHelper.cs
-    └── Forms/
-        ├── LoginForm.cs
-        ├── Admin/
-        │   └── AdminDashboard.cs
-        └── Hospital/
-            ├── BSForm.cs
-            ├── DPVForm.cs
-            ├── KTVForm.cs
-            └── BNForm.cs
+│   ├── 07_YC4_Backup_Recovery.sql
+│   ├── 08_App_Migrations.sql
+│   ├── 09_OLS_NhanVien_Unified.sql
+│   └── 09_Recovery_Demo.sql
+├── scripts/
+│   └── setup.ps1          ← Runner SQL*Plus
+├── docs/
+│   ├── assignment/        ← Đề bài gốc
+│   ├── guides/            ← Demo, encryption, vấn đáp
+│   ├── reports/           ← Draft báo cáo và review cuối
+│   └── planning/          ← Kế hoạch nội bộ
+└── dist/
+    └── win-x64/           ← Bản publish chạy thử
 ```
 
 ---
@@ -148,6 +147,15 @@ Chạy tuần tự các script trong `PhanHe2/` với SQL*Plus hoặc SQL Develo
 @PhanHe2/05_YC2_OLS_ThongBao.sql    -- Cần LBACSYS (Oracle Label Security)
 @PhanHe2/06_YC3_Audit.sql
 @PhanHe2/07_YC4_Backup_Recovery.sql
+@PhanHe2/08_App_Migrations.sql
+@PhanHe2/09_OLS_NhanVien_Unified.sql
+@PhanHe2/09_Recovery_Demo.sql        -- Demo, có thể chạy riêng khi vấn đáp
+```
+
+Hoặc dùng runner PowerShell:
+
+```powershell
+.\scripts\setup.ps1 -HostName localhost -Port 1521 -Sid XEPDB1 -SysPass oracle -SkipRecoveryDemo
 ```
 
 ### Bước 2 – Chạy ứng dụng
@@ -160,7 +168,13 @@ dotnet run
 
 ### Bước 3 – Đăng nhập
 
-Nhập thông tin kết nối Oracle (Host/Port/SID) và tài khoản. Ứng dụng tự nhận diện vai trò và mở giao diện phù hợp:
+Nhập thông tin kết nối Oracle XE và tài khoản. Ứng dụng tự nhận diện vai trò và mở giao diện phù hợp:
+
+```text
+Host: localhost
+Port: 1521
+Service: XEPDB1
+```
 
 | Tài khoản | Vai trò | Giao diện |
 |-----------|---------|-----------|
@@ -169,8 +183,52 @@ Nhập thông tin kết nối Oracle (Host/Port/SID) và tài khoản. Ứng d�
 | `BS_NV003` | Bác sĩ / Y sĩ | BSForm |
 | `KTV_NV006` | Kỹ thuật viên | KTVForm |
 | `BN_BN001` | Bệnh nhân | BNForm |
+| `u1_giamdoc` | OLS demo | OLSViewerForm |
+| `u4_nvtk_hcm` | OLS demo | OLSViewerForm |
+| `u8_nvth_hni` | OLS demo | OLSViewerForm |
 
 > Mật khẩu mặc định cho tài khoản mẫu: `BV@2025!`
+
+Mật khẩu OLS demo: `U1@2025`, `U2@2025`, ..., `U8@2025`.
+
+### Font Montserrat
+
+App tự nạp font từ `HospitalApp/Resources/Fonts/*.ttf`. Nếu máy chưa có font, copy các file Montserrat `.ttf` vào thư mục này rồi build lại. Nếu không có file font, app fallback về Segoe UI và vẫn chạy bình thường.
+
+### Oracle Net Encryption
+
+Xem [docs/guides/SETUP_ENCRYPTION.md](docs/guides/SETUP_ENCRYPTION.md). Tóm tắt cấu hình client trong `sqlnet.ora`:
+
+```text
+SQLNET.ENCRYPTION_CLIENT = REQUIRED
+SQLNET.ENCRYPTION_TYPES_CLIENT = (AES256, AES192, AES128)
+SQLNET.CRYPTO_CHECKSUM_CLIENT = REQUIRED
+SQLNET.CRYPTO_CHECKSUM_TYPES_CLIENT = (SHA512, SHA384, SHA256)
+```
+
+Kiểm tra bằng:
+
+```sql
+SELECT NETWORK_SERVICE_BANNER
+FROM V$SESSION_CONNECT_INFO
+WHERE SID = SYS_CONTEXT('USERENV','SID');
+```
+
+### Bảo mật lớp ứng dụng
+
+- `HospitalApp/Security/OracleErrorMapper.cs`: map lỗi Oracle sang thông báo thân thiện, tránh lộ raw schema/error.
+- `HospitalApp/Security/InputValidator.cs`: validate CCCD, số điện thoại, mã định danh, password strength, mask CCCD.
+- `HospitalApp/Security/SessionManager.cs`: idle timeout và tự logout.
+- `HospitalApp/Security/AppAuditLogger.cs`: rolling log phía app.
+- `HospitalApp/Controls/ConfirmDeleteDialog.cs`: xác nhận thao tác xoá.
+- `HospitalApp/Forms/LoginForm.cs`: brute-force lockout 5 lần sai trong 60 giây.
+
+### Tài liệu nộp bài và vấn đáp
+
+- [docs/reports/REPORT_DRAFT.md](docs/reports/REPORT_DRAFT.md): khung báo cáo Markdown để điền MSSV, ảnh chụp và convert sang `.docx`.
+- [docs/guides/DEMO_SCRIPT.md](docs/guides/DEMO_SCRIPT.md): kịch bản demo từng role.
+- [docs/guides/TALKING_POINTS.md](docs/guides/TALKING_POINTS.md): câu hỏi vấn đáp thường gặp.
+- [docs/reports/FINAL_REVIEW.md](docs/reports/FINAL_REVIEW.md): review cuối sau khi hoàn thiện repo.
 
 ---
 

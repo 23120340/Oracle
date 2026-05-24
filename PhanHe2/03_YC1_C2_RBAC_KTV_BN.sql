@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 -- PHÂN HỆ 2 - File 03: Yêu cầu 1, Câu 2 - RBAC cho KTV và Bệnh nhân
 -- ============================================================
 -- TC#4 (Kỹ thuật viên):
@@ -17,7 +17,7 @@
 -- Chạy với BVADMIN sau khi chạy 01 và 02
 -- ============================================================
 
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 
 -- ============================================================
 -- PHẦN A: ROLE VÀ VIEW CHO KỸ THUẬT VIÊN (TC#4)
@@ -50,7 +50,7 @@ BEGIN
     OR :NEW.MAKTV   != :OLD.MAKTV
     THEN
         RAISE_APPLICATION_ERROR(-20001,
-            'KTV chỉ được cập nhật cột KETQUA.');
+            N'KTV chỉ được cập nhật cột KETQUA.');
     END IF;
 
     -- Thực hiện UPDATE thực sự trên bảng gốc (chỉ KETQUA)
@@ -101,13 +101,13 @@ GRANT KTV_Role TO KTV_NV006;
 GRANT KTV_Role TO KTV_NV007;
 
 -- Tạo synonym cho KTV dễ truy cập (không cần tiền tố BVADMIN)
-CONNECT KTV_NV006/BV@2025!;
+CONNECT KTV_NV006/"BV@2025!";
 CREATE OR REPLACE SYNONYM MY_HSBA_DV FOR BVADMIN.KTV_HSBA_DV_View;
 
 -- ============================================================
 -- PHẦN B: ROLE VÀ VIEW CHO BỆNH NHÂN (TC#5)
 -- ============================================================
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 
 -- B1. View lọc: BN chỉ thấy dòng của chính mình trong BENHNHAN
 CREATE OR REPLACE VIEW BN_BENHNHAN_View AS
@@ -133,7 +133,7 @@ BEGIN
     OR :NEW.CCCD     != :OLD.CCCD
     THEN
         RAISE_APPLICATION_ERROR(-20002,
-            'Không được phép thay đổi MABN, TÊNBN, PHÁI, NGÀYSINH, CCCD.');
+            N'Không được phép thay đổi MABN, TÊNBN, PHÁI, NGÀYSINH, CCCD.');
     END IF;
 
     -- UPDATE chỉ các trường được phép (địa chỉ + tiền sử bệnh)
@@ -180,7 +180,7 @@ GRANT BenhNhan_Role TO BN_BN003;
 -- ============================================================
 
 -- Test KTV_NV006 (kỹ thuật viên):
-CONNECT KTV_NV006/BV@2025!;
+CONNECT KTV_NV006/"BV@2025!";
 SELECT * FROM SESSION_ROLES;
 -- Kết quả: KTV_ROLE
 
@@ -199,7 +199,7 @@ SET    MAKTV = 'NV007'
 WHERE  MAHSBA = 'HS001';
 
 -- Test BN_BN001 (bệnh nhân):
-CONNECT BN_BN001/BV@2025!;
+CONNECT BN_BN001/"BV@2025!";
 SELECT * FROM SESSION_ROLES;
 -- Kết quả: BENHNHAN_ROLE
 
@@ -219,7 +219,7 @@ UPDATE BVADMIN.BN_BENHNHAN_View SET TENBN = N'Tên khác' WHERE MABN = 'BN001';
 SELECT * FROM BVADMIN.BENHNHAN;
 
 -- Xem log ghi vết KTV (chạy với BVADMIN)
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 SELECT MAHSBA, LOAIDV, MAKTV, OLD_KETQUA, NEW_KETQUA, CHANGED_BY, CHANGED_AT
 FROM   LOG_KTV_KETQUA
 ORDER  BY CHANGED_AT DESC;

@@ -1,4 +1,7 @@
+using HospitalApp.Controls;
 using HospitalApp.Database;
+using HospitalApp.Security;
+using HospitalApp.Theme;
 using Oracle.ManagedDataAccess.Client;
 
 namespace HospitalApp.Forms.Hospital;
@@ -11,6 +14,7 @@ namespace HospitalApp.Forms.Hospital;
 public class BNForm : Form
 {
     private readonly OracleHelper _db;
+    private readonly SessionManager _session;
     private TabControl _tabs = null!;
 
     // Tab thông tin cá nhân
@@ -35,24 +39,106 @@ public class BNForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = Color.FromArgb(255, 252, 248);
         BuildUI();
+
+        ShortcutHelper.WireStandard(this,
+            onRefresh: LoadMyInfo,
+            onSave:    () => BtnSaveInfo_Click(null, EventArgs.Empty));
+
+        _session = new SessionManager(this, db.Username);
+        FormClosed += (_, _) => _session.Dispose();
     }
 
     private void BuildUI()
     {
-        var header = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = Color.FromArgb(140, 60, 140) };
-        header.Controls.Add(new Label
-        {
-            Text = "🧑‍⚕  Phân hệ 2 – Bệnh nhân",
-            Dock = DockStyle.Fill, ForeColor = Color.White,
-            Font = new Font("Segoe UI", 13, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter
-        });
-        Controls.Add(header);
+        Size = new Size(1180, 720);
+        MinimumSize = new Size(1000, 600);
+        BackColor = UiTheme.BgLight;
 
-        _tabs = new TabControl { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9) };
+        _tabs = new TabControl
+        {
+            Dock = DockStyle.Fill, Font = UiTheme.Body(),
+            Appearance = TabAppearance.FlatButtons,
+            SizeMode = TabSizeMode.Fixed,
+            ItemSize = new Size(0, 1)
+        };
         _tabs.TabPages.Add(BuildInfoTab());
         _tabs.TabPages.Add(BuildHSBATab());
         _tabs.TabPages.Add(BuildThongBaoTab());
+
+        var header = BuildAppHeader("Hồ sơ bệnh nhân", "BN", UiTheme.HealthCyan);
+
+        var sidebar = new Sidebar { AccentColor = UiTheme.HealthCyan, Dock = DockStyle.Left };
+        sidebar.AddBrand("HospitalApp", _db.Username);
+        sidebar.AddSection("Hồ sơ");
+        sidebar.AddItem("info", IconRegistry.Person,   "Thông tin của tôi");
+        sidebar.AddItem("hsba", IconRegistry.Health,   "Lịch sử khám");
+        sidebar.AddSection("Khác");
+        sidebar.AddItem("tb",   IconRegistry.Bell,     "Thông báo");
+        sidebar.ItemSelected += key =>
+        {
+            _tabs.SelectedIndex = key switch
+            { "info" => 0, "hsba" => 1, "tb" => 2, _ => 0 };
+        };
+
+        var status = new StatusBar
+        {
+            LeftText   = $"{IconRegistry.Database}  {_db.Host}:{_db.Port}/{_db.Sid}",
+            CenterText = $"{_db.Username}  ·  Bệnh nhân"
+        };
+
         Controls.Add(_tabs);
+        Controls.Add(header);
+        Controls.Add(sidebar);
+        Controls.Add(status);
+
+        sidebar.SelectByKey("info");
+    }
+
+    private Panel BuildAppHeader(string title, string roleLabel, Color roleColor)
+    {
+        var header = new Panel
+        {
+            Dock = DockStyle.Top, Height = 60,
+            BackColor = UiTheme.Surface,
+            Padding = new Padding(24, 12, 24, 12)
+        };
+        var lblTitle = new Label
+        {
+            Text = title, Dock = DockStyle.Left, Width = 300,
+            Font = UiTheme.Heading2(), ForeColor = UiTheme.TextDark,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        var roleChip = new RoleChip
+        {
+            Text = roleLabel, AccentColor = roleColor,
+            Anchor = AnchorStyles.Right | AnchorStyles.Top
+        };
+        var btnLogout = new RoundedButton
+        {
+            Text = "Đăng xuất", Glyph = IconRegistry.SignOut,
+            BackColor = UiTheme.BgLight, ForeColor = UiTheme.TextDark,
+            GlyphColor = UiTheme.Danger,
+            Width = 130, Height = 36,
+            Anchor = AnchorStyles.Right | AnchorStyles.Top
+        };
+        btnLogout.Click += (_, _) =>
+        {
+            if (MessageBox.Show("Đăng xuất?", "Xác nhận",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                Close();
+        };
+        void layout()
+        {
+            btnLogout.Location = new Point(header.Width - btnLogout.Width - 16, 12);
+            roleChip.Location  = new Point(btnLogout.Left - roleChip.Width - 12, 17);
+        }
+        header.Resize += (_, _) => layout();
+        roleChip.HandleCreated += (_, _) => layout();
+        header.Controls.Add(roleChip);
+        header.Controls.Add(btnLogout);
+        header.Controls.Add(lblTitle);
+        layout();
+        return header;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -111,7 +197,7 @@ public class BNForm : Form
         {
             Text = "💾  Lưu thông tin", Width = 180, Height = 36,
             BackColor = Color.FromArgb(140, 60, 140), ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            FlatStyle = FlatStyle.Flat, Font = UiTheme.Heading3(),
             Cursor = Cursors.Hand, Margin = new Padding(0, 10, 0, 0)
         };
         _btnSaveInfo.Click += BtnSaveInfo_Click;
@@ -175,7 +261,8 @@ public class BNForm : Form
                 OracleHelper.Param("tsbgd", _txtTSBGD.Text),
                 OracleHelper.Param("dt",    _txtDiung.Text),
                 OracleHelper.Param("id",    _lblMABN.Text));
-            ShowSuccess("Cập nhật thông tin thành công.");
+            AppAuditLogger.Info(_db.Username, "BN.SaveInfo", $"mabn={_lblMABN.Text}");
+            Toast.Show(this, "Đã cập nhật thông tin cá nhân", Toast.Kind.Success);
         });
     }
 
@@ -199,14 +286,14 @@ public class BNForm : Form
             Dock = DockStyle.Bottom, Height = 30, TextAlign = ContentAlignment.MiddleLeft,
             Padding = new Padding(8, 0, 0, 0),
             Text = "ℹ Chỉ hiển thị Mã HSBA, Ngày khám, Khoa và Kết luận. Thông tin chẩn đoán chi tiết do bác sĩ quản lý.",
-            ForeColor = Color.DimGray, Font = new Font("Segoe UI", 8)
+            ForeColor = Color.DimGray, Font = UiTheme.Body(8f)
         };
 
         var btn = new Button
         {
             Dock = DockStyle.Top, Text = "🔄 Tải lịch sử khám bệnh", Height = 36,
             BackColor = Color.SteelBlue, ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9), Cursor = Cursors.Hand
+            FlatStyle = FlatStyle.Flat, Font = UiTheme.Body(), Cursor = Cursors.Hand
         };
         btn.Click += (_, _) => TryCatch(() =>
         {
@@ -240,7 +327,7 @@ public class BNForm : Form
         {
             Dock = DockStyle.Top, Text = "🔄 Tải thông báo", Height = 36,
             BackColor = Color.SteelBlue, ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9)
+            FlatStyle = FlatStyle.Flat, Font = UiTheme.Body()
         };
         btn.Click += (_, _) => TryCatch(() =>
         {
@@ -259,41 +346,46 @@ public class BNForm : Form
     private static Label SectionLabel(string text) => new()
     {
         Text = text, AutoSize = true,
-        Font = new Font("Segoe UI", 10, FontStyle.Bold),
+        Font = UiTheme.Heading3(),
         ForeColor = Color.FromArgb(100, 40, 100),
         Padding = new Padding(0, 8, 0, 4)
     };
 
     private static Label FieldLabel(string text) => new()
     {
-        Text = text, AutoSize = true, Font = new Font("Segoe UI", 9),
+        Text = text, AutoSize = true, Font = UiTheme.Body(),
         Padding = new Padding(0, 5, 6, 2)
     };
 
     private static Label ReadonlyValue(string val) => new()
     {
         Text = val, AutoSize = true, ForeColor = Color.DimGray,
-        Font = new Font("Segoe UI", 9, FontStyle.Italic),
+        Font = UiTheme.Italic(),
         Padding = new Padding(0, 5, 0, 2)
     };
 
     private static TextBox EditBox(int width) => new()
     {
-        Width = width, Height = 24, Font = new Font("Segoe UI", 9),
+        Width = width, Height = 24, Font = UiTheme.Body(),
         BorderStyle = BorderStyle.FixedSingle
     };
 
     private static TextBox MemoBox(int width, int height) => new()
     {
         Width = width, Height = height, Multiline = true,
-        ScrollBars = ScrollBars.Vertical, Font = new Font("Segoe UI", 9),
+        ScrollBars = ScrollBars.Vertical, Font = UiTheme.Body(),
         BorderStyle = BorderStyle.FixedSingle
     };
 
-    private static void TryCatch(Action a)
+    private void TryCatch(Action a, [System.Runtime.CompilerServices.CallerMemberName] string caller = "")
     {
         try { a(); }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        catch (Exception ex)
+        {
+            AppAuditLogger.Error(_db.Username, $"BN.{caller}", ex.Message);
+            MessageBox.Show(OracleErrorMapper.Friendly(ex), "Lỗi",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     private static void ShowSuccess(string m) =>

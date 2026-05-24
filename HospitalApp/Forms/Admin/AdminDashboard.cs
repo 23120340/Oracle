@@ -1,4 +1,8 @@
+using System.Data;
+using HospitalApp.Controls;
 using HospitalApp.Database;
+using HospitalApp.Security;
+using HospitalApp.Theme;
 using Oracle.ManagedDataAccess.Client;
 
 namespace HospitalApp.Forms.Admin;
@@ -10,6 +14,7 @@ namespace HospitalApp.Forms.Admin;
 public class AdminDashboard : Form
 {
     private readonly OracleHelper _db;
+    private readonly SessionManager _session;
     private TabControl _tabs = null!;
 
     // ── User tab controls ──────────────────────────────────────────────────────
@@ -52,46 +57,275 @@ public class AdminDashboard : Form
     {
         _db   = db;
         Text  = $"Quản trị CSDL Oracle – {db.Username}@{db.Host}/{db.Sid}";
-        Size  = new Size(1050, 720);
+        Size  = new Size(1200, 780);
         StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize   = new Size(900, 600);
-        BackColor     = Color.FromArgb(245, 248, 255);
+        MinimumSize   = new Size(1000, 650);
+        BackColor     = UiTheme.BgLight;
+        Font          = UiTheme.Body();
 
         BuildUI();
+
+        // DBA có nhiều quyền → idle timeout ngắn hơn (5 phút)
+        _session = new SessionManager(this, db.Username, TimeSpan.FromMinutes(5));
+        FormClosed += (_, _) => _session.Dispose();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // UI BUILDER
+    // UI BUILDER — Sidebar + KPI + Status bar
     // ═══════════════════════════════════════════════════════════════════════════
     private void BuildUI()
     {
-        var header = new Panel
-        {
-            Dock      = DockStyle.Top,
-            Height    = 50,
-            BackColor = Color.FromArgb(30, 90, 160)
-        };
-        header.Controls.Add(new Label
-        {
-            Text      = "⚙  Phân hệ 1 – Quản trị CSDL Oracle",
-            Dock      = DockStyle.Fill,
-            ForeColor = Color.White,
-            Font      = new Font("Segoe UI", 13, FontStyle.Bold),
-            TextAlign = ContentAlignment.MiddleCenter
-        });
-        Controls.Add(header);
-
+        // Hidden TabControl: chứa nội dung 6 tab, sidebar control SelectedIndex
         _tabs = new TabControl
         {
             Dock = DockStyle.Fill,
-            Font = new Font("Segoe UI", 9)
+            Font = UiTheme.Body(),
+            Appearance = TabAppearance.FlatButtons,
+            SizeMode = TabSizeMode.Fixed,
+            ItemSize = new Size(0, 1)  // ẩn tab headers
         };
         _tabs.TabPages.Add(BuildUserTab());
         _tabs.TabPages.Add(BuildRoleTab());
         _tabs.TabPages.Add(BuildGrantTab());
         _tabs.TabPages.Add(BuildRevokeTab());
         _tabs.TabPages.Add(BuildViewPrivTab());
+        _tabs.TabPages.Add(BuildAuditTab());
+
+        // KPI row
+        var kpiRow = BuildKpiRow();
+
+        // Top header bar
+        var header = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 60,
+            BackColor = UiTheme.Surface,
+            Padding = new Padding(24, 12, 24, 12)
+        };
+        var title = new Label
+        {
+            Text = "Quản trị Cơ sở dữ liệu",
+            Dock = DockStyle.Left, Width = 400,
+            Font = UiTheme.Heading2(),
+            ForeColor = UiTheme.TextDark,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        var roleChip = new RoleChip
+        {
+            Text = "DBA",
+            AccentColor = UiTheme.Primary,
+            Anchor = AnchorStyles.Right | AnchorStyles.Top
+        };
+        var btnLogout = new RoundedButton
+        {
+            Text = "Đăng xuất",
+            Glyph = IconRegistry.SignOut,
+            BackColor = UiTheme.BgLight,
+            ForeColor = UiTheme.TextDark,
+            GlyphColor = UiTheme.Danger,
+            Anchor = AnchorStyles.Right | AnchorStyles.Top,
+            Width = 130, Height = 36
+        };
+        btnLogout.Click += (_, _) =>
+        {
+            if (MessageBox.Show("Đăng xuất khỏi hệ thống?", "Xác nhận",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                Close();
+        };
+        void layoutHeader()
+        {
+            btnLogout.Location = new Point(header.Width - btnLogout.Width - 16, 12);
+            roleChip.Location  = new Point(btnLogout.Left - roleChip.Width - 12, 17);
+        }
+        header.Resize += (_, _) => layoutHeader();
+        roleChip.HandleCreated += (_, _) => layoutHeader();
+        header.Controls.Add(roleChip);
+        header.Controls.Add(btnLogout);
+        header.Controls.Add(title);
+        layoutHeader();
+
+        // Sidebar
+        var sidebar = new Sidebar
+        {
+            AccentColor = UiTheme.HealthCyanLight,
+            Dock = DockStyle.Left
+        };
+        sidebar.AddBrand("HospitalApp", $"Quản trị · {_db.Username}");
+        sidebar.AddSection("Quản lý");
+        sidebar.AddItem("users",  IconRegistry.People,    "Người dùng");
+        sidebar.AddItem("roles",  IconRegistry.Tag,       "Vai trò");
+        sidebar.AddSection("Quyền truy cập");
+        sidebar.AddItem("grant",  IconRegistry.Key,       "Cấp quyền");
+        sidebar.AddItem("revoke", IconRegistry.Lock,      "Thu hồi");
+        sidebar.AddItem("view",   IconRegistry.Document,  "Xem quyền");
+        sidebar.AddSection("Hệ thống");
+        sidebar.AddItem("audit",  IconRegistry.Shield,    "Nhật ký audit");
+
+        sidebar.ItemSelected += key =>
+        {
+            _tabs.SelectedIndex = key switch
+            {
+                "users"  => 0, "roles" => 1, "grant" => 2,
+                "revoke" => 3, "view"  => 4, "audit" => 5,
+                _ => 0
+            };
+        };
+
+        // Status bar
+        var status = new StatusBar
+        {
+            LeftText   = $"{IconRegistry.Database}  {_db.Host}:{_db.Port}/{_db.Sid}",
+            CenterText = $"Đã đăng nhập: {_db.Username}  ·  Vai trò: DBA"
+        };
+
+        // Add theo thứ tự: Fill trước, Dock zone sau (later dock = inner)
         Controls.Add(_tabs);
+        Controls.Add(kpiRow);
+        Controls.Add(header);
+        Controls.Add(sidebar);
+        Controls.Add(status);
+
+        sidebar.SelectByKey("users");
+    }
+
+    private Panel BuildKpiRow()
+    {
+        var panel = new Panel
+        {
+            Dock = DockStyle.Top, Height = 130,
+            BackColor = UiTheme.BgLight,
+            Padding = new Padding(24, 12, 24, 12)
+        };
+        var flow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            AutoScroll = false,
+            BackColor = UiTheme.BgLight
+        };
+
+        var kpiUsers = new KpiCard
+        {
+            Glyph = IconRegistry.People, GlyphColor = UiTheme.HealthCyan,
+            Label = "Người dùng", Value = "—", Subtext = "tổng số tài khoản",
+            Width = 240, Height = 100,
+            Margin = new Padding(0, 0, 12, 0)
+        };
+        var kpiRoles = new KpiCard
+        {
+            Glyph = IconRegistry.Tag, GlyphColor = UiTheme.HealthEmerald,
+            Label = "Vai trò", Value = "—", Subtext = "roles đã định nghĩa",
+            Width = 240, Height = 100,
+            Margin = new Padding(0, 0, 12, 0)
+        };
+        var kpiGrants = new KpiCard
+        {
+            Glyph = IconRegistry.Key, GlyphColor = UiTheme.StatusWarning,
+            Label = "Cấp quyền", Value = "—", Subtext = "object/role privileges",
+            Width = 240, Height = 100,
+            Margin = new Padding(0, 0, 12, 0)
+        };
+        var kpiAudit = new KpiCard
+        {
+            Glyph = IconRegistry.Shield, GlyphColor = UiTheme.StatusDanger,
+            Label = "Audit hôm nay", Value = "—", Subtext = "lượt thao tác đã ghi",
+            Width = 240, Height = 100,
+            Margin = new Padding(0, 0, 12, 0)
+        };
+
+        flow.Controls.AddRange(new Control[] { kpiUsers, kpiRoles, kpiGrants, kpiAudit });
+        panel.Controls.Add(flow);
+
+        // Refresh KPI numbers khi form shown
+        Shown += (_, _) => RefreshKpis(kpiUsers, kpiRoles, kpiGrants, kpiAudit);
+        return panel;
+    }
+
+    private void RefreshKpis(KpiCard kU, KpiCard kR, KpiCard kG, KpiCard kA)
+    {
+        TryCatch(() =>
+        {
+            try
+            {
+                kU.Value = _db.Scalar("SELECT COUNT(*) FROM DBA_USERS")?.ToString() ?? "—";
+                kR.Value = _db.Scalar("SELECT COUNT(*) FROM DBA_ROLES")?.ToString() ?? "—";
+                kG.Value = _db.Scalar("SELECT COUNT(*) FROM DBA_TAB_PRIVS WHERE GRANTEE NOT IN ('SYS','SYSTEM','PUBLIC')")?.ToString() ?? "—";
+                kA.Value = _db.Scalar("SELECT COUNT(*) FROM DBA_AUDIT_TRAIL WHERE TRUNC(TIMESTAMP)=TRUNC(SYSDATE)")?.ToString() ?? "—";
+            }
+            catch { /* may not have full DBA privs, ignore */ }
+            kU.Invalidate(); kR.Invalidate(); kG.Invalidate(); kA.Invalidate();
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TAB 6 (NEW): AUDIT LOG VIEWER — Đọc DBA_AUDIT_TRAIL + APP_LOGIN_LOG
+    // ═══════════════════════════════════════════════════════════════════════════
+    private TabPage BuildAuditTab()
+    {
+        var page = new TabPage("Audit");
+        var container = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24) };
+
+        var card = new Card
+        {
+            Dock = DockStyle.Fill,
+            ShowShadow = true,
+            Padding = new Padding(16)
+        };
+
+        var titleRow = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = UiTheme.Surface };
+        var lblTitle = new Label
+        {
+            Text = "Nhật ký kiểm toán hệ thống",
+            Dock = DockStyle.Left, Width = 350,
+            Font = UiTheme.Heading3(),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        var btnRefresh = new RoundedButton
+        {
+            Text = "Làm mới", Glyph = IconRegistry.Refresh,
+            BackColor = UiTheme.HealthCyan,
+            Width = 130, Height = 36,
+            Dock = DockStyle.Right
+        };
+
+        var grid = new DataGridView
+        {
+            Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            BackgroundColor = Color.White, RowHeadersVisible = false,
+            Font = UiTheme.Body(),
+            EnableHeadersVisualStyles = false,
+            BorderStyle = BorderStyle.None,
+            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+            {
+                BackColor = UiTheme.BgLight,
+                ForeColor = UiTheme.TextDark,
+                Font = UiTheme.LabelBold(),
+                Padding = new Padding(8, 4, 8, 4)
+            }
+        };
+
+        btnRefresh.Click += (_, _) => TryCatch(() =>
+        {
+            grid.DataSource = _db.Query(
+                "SELECT TO_CHAR(TIMESTAMP, 'DD/MM HH24:MI:SS') AS TIME, " +
+                "USERNAME, OBJ_NAME AS OBJECT, ACTION_NAME AS ACTION, " +
+                "DECODE(RETURNCODE, 0, 'OK', 'FAIL') AS RESULT " +
+                "FROM DBA_AUDIT_TRAIL " +
+                "WHERE TIMESTAMP > SYSDATE - 7 " +
+                "ORDER BY TIMESTAMP DESC " +
+                "FETCH FIRST 200 ROWS ONLY");
+        });
+
+        titleRow.Controls.Add(btnRefresh);
+        titleRow.Controls.Add(lblTitle);
+        card.Controls.Add(grid);
+        card.Controls.Add(titleRow);
+        container.Controls.Add(card);
+        page.Controls.Add(container);
+        page.Enter += (_, _) => btnRefresh.PerformClick();
+        return page;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -297,7 +531,7 @@ public class AdminDashboard : Form
         };
         _pnlObjectPriv.Controls.Add(new Label
         {
-            Text = "OBJECT PRIVILEGE", Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            Text = "OBJECT PRIVILEGE", Font = UiTheme.LabelBold(),
             Location = new Point(10, 5), AutoSize = true, ForeColor = Color.Navy
         });
         int py = 30;
@@ -330,7 +564,7 @@ public class AdminDashboard : Form
             Text     = "WITH GRANT OPTION",
             Location = new Point(250, py),
             AutoSize = true,
-            Font     = new Font("Segoe UI", 9)
+            Font     = UiTheme.Body()
         };
         _pnlObjectPriv.Controls.Add(_chkGrantOption);
 
@@ -370,7 +604,7 @@ public class AdminDashboard : Form
         };
         _pnlSysPriv.Controls.Add(new Label
         {
-            Text = "SYSTEM PRIVILEGE", Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            Text = "SYSTEM PRIVILEGE", Font = UiTheme.LabelBold(),
             Location = new Point(10, 5), AutoSize = true, ForeColor = Color.Navy
         });
         _pnlSysPriv.Controls.Add(Lbl("Quyền hệ thống:", 10, 35));
@@ -409,7 +643,7 @@ public class AdminDashboard : Form
         };
         _pnlRole.Controls.Add(new Label
         {
-            Text = "GRANT ROLE", Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            Text = "GRANT ROLE", Font = UiTheme.LabelBold(),
             Location = new Point(10, 5), AutoSize = true, ForeColor = Color.Navy
         });
         _pnlRole.Controls.Add(Lbl("Role:", 10, 35));
@@ -785,32 +1019,35 @@ public class AdminDashboard : Form
 
     private static Label Lbl(string text, int x = 0, int y = 0) =>
         new() { Text = text, Location = new Point(x, y), AutoSize = true,
-                Font = new Font("Segoe UI", 9) };
+                Font = UiTheme.Body() };
 
     private static Label Label(string text) =>
-        new() { Text = text, AutoSize = true, Font = new Font("Segoe UI", 9),
+        new() { Text = text, AutoSize = true, Font = UiTheme.Body(),
                 Padding = new Padding(0, 5, 0, 0) };
 
     private static TextBox TB(int width, bool isPass = false) =>
-        new() { Width = width, Height = 24, Font = new Font("Segoe UI", 9),
+        new() { Width = width, Height = 24, Font = UiTheme.Body(),
                 PasswordChar = isPass ? '●' : '\0', BorderStyle = BorderStyle.FixedSingle };
 
     private static Button Btn(string text, Color backColor, int width = 120) =>
         new() { Text = text, Width = width, Height = 30, BackColor = backColor,
                 ForeColor = Color.White, FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9), Cursor = Cursors.Hand,
+                Font = UiTheme.Body(), Cursor = Cursors.Hand,
                 Padding = new Padding(2) };
 
     private static ComboBox Cmb(int x, int y, int width) =>
         new() { Location = new Point(x, y), Size = new Size(width, 24),
-                DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9) };
+                DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Body() };
 
-    private static void TryCatch(Action action)
+    private void TryCatch(Action action,
+        [System.Runtime.CompilerServices.CallerMemberName] string caller = "")
     {
         try { action(); }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            AppAuditLogger.Error(_db.Username, $"Admin.{caller}", ex.Message);
+            MessageBox.Show(OracleErrorMapper.Friendly(ex), "Lỗi",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 

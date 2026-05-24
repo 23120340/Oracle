@@ -1,0 +1,6 @@
+HospitalApp/bin/
+HospitalApp/obj/
+
+*.user
+*.suo
+*.log

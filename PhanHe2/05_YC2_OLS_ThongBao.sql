@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 -- PHÂN HỆ 2 - File 05: Yêu cầu 2 - Oracle Label Security (OLS)
 -- ============================================================
 -- Bệnh viện có 3 khoa: Tiêu hóa, Thần kinh, Tim mạch
@@ -173,7 +173,7 @@ END;
 -- BƯỚC 7: Tạo user u1–u8 và thiết lập nhãn
 -- ============================================================
 -- u1: Giám đốc - đọc được toàn bộ
-CREATE USER u1_giamdoc IDENTIFIED BY U1@2025 DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
+CREATE USER u1_giamdoc IDENTIFIED BY "U1@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
 GRANT CREATE SESSION TO u1_giamdoc;
 GRANT SELECT ON BVADMIN.THONGBAO TO u1_giamdoc;
 
@@ -184,7 +184,7 @@ SA_USER_ADMIN.SET_USER_LABELS(
 );
 
 -- u2: Lãnh đạo Khoa tim mạch tại HCM
-CREATE USER u2_ldtm_hcm IDENTIFIED BY U2@2025 DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
+CREATE USER u2_ldtm_hcm IDENTIFIED BY "U2@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
 GRANT CREATE SESSION TO u2_ldtm_hcm;
 GRANT SELECT ON BVADMIN.THONGBAO TO u2_ldtm_hcm;
 
@@ -195,7 +195,7 @@ SA_USER_ADMIN.SET_USER_LABELS(
 );
 
 -- u3: Lãnh đạo Khoa thần kinh tại Hà Nội
-CREATE USER u3_ldtk_hni IDENTIFIED BY U3@2025 DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
+CREATE USER u3_ldtk_hni IDENTIFIED BY "U3@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
 GRANT CREATE SESSION TO u3_ldtk_hni;
 GRANT SELECT ON BVADMIN.THONGBAO TO u3_ldtk_hni;
 
@@ -206,7 +206,7 @@ SA_USER_ADMIN.SET_USER_LABELS(
 );
 
 -- u4: Nhân viên Khoa thần kinh tại HCM
-CREATE USER u4_nvtk_hcm IDENTIFIED BY U4@2025 DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
+CREATE USER u4_nvtk_hcm IDENTIFIED BY "U4@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
 GRANT CREATE SESSION TO u4_nvtk_hcm;
 GRANT SELECT ON BVADMIN.THONGBAO TO u4_nvtk_hcm;
 
@@ -217,7 +217,7 @@ SA_USER_ADMIN.SET_USER_LABELS(
 );
 
 -- u5: Nhân viên Khoa tim mạch tại HCM
-CREATE USER u5_nvtm_hcm IDENTIFIED BY U5@2025 DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
+CREATE USER u5_nvtm_hcm IDENTIFIED BY "U5@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
 GRANT CREATE SESSION TO u5_nvtm_hcm;
 GRANT SELECT ON BVADMIN.THONGBAO TO u5_nvtm_hcm;
 
@@ -228,7 +228,7 @@ SA_USER_ADMIN.SET_USER_LABELS(
 );
 
 -- u6: Lãnh đạo phòng - Khoa tim mạch tại HCM
-CREATE USER u6_ldp_tm_hcm IDENTIFIED BY U6@2025 DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
+CREATE USER u6_ldp_tm_hcm IDENTIFIED BY "U6@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
 GRANT CREATE SESSION TO u6_ldp_tm_hcm;
 GRANT SELECT ON BVADMIN.THONGBAO TO u6_ldp_tm_hcm;
 
@@ -239,7 +239,7 @@ SA_USER_ADMIN.SET_USER_LABELS(
 );
 
 -- u7: Lãnh đạo phòng - đọc toàn bộ thông báo cấp lãnh đạo
-CREATE USER u7_ldp_all IDENTIFIED BY U7@2025 DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
+CREATE USER u7_ldp_all IDENTIFIED BY "U7@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
 GRANT CREATE SESSION TO u7_ldp_all;
 GRANT SELECT ON BVADMIN.THONGBAO TO u7_ldp_all;
 
@@ -250,7 +250,7 @@ SA_USER_ADMIN.SET_USER_LABELS(
 );
 
 -- u8: Nhân viên Khoa tiêu hóa tại Hà Nội
-CREATE USER u8_nvth_hni IDENTIFIED BY U8@2025 DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
+CREATE USER u8_nvth_hni IDENTIFIED BY "U8@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
 GRANT CREATE SESSION TO u8_nvth_hni;
 GRANT SELECT ON BVADMIN.THONGBAO TO u8_nvth_hni;
 
@@ -264,7 +264,7 @@ SA_USER_ADMIN.SET_USER_LABELS(
 -- BƯỚC 8: Insert dữ liệu thông báo t1–t7 với nhãn OLS
 -- Phải chạy với tài khoản có quyền WRITEUP hoặc BVADMIN được exempt
 -- ============================================================
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 
 -- Cấp quyền FULL để BVADMIN có thể gán nhãn bất kỳ
 SA_USER_ADMIN.SET_USER_PRIVS(
@@ -319,37 +319,37 @@ SA_SESSION.RESTORE_DEFAULT_LABELS('BV_LABEL_POLICY');
 -- ============================================================
 
 -- u1 (BGD) - thấy tất cả t1-t7
-CONNECT u1_giamdoc/U1@2025;
+CONNECT u1_giamdoc/"U1@2025";
 SELECT MATB, SUBSTR(NOIDUNG,1,60) AS NOIDUNG FROM BVADMIN.THONGBAO;
 -- Kết quả: 7 dòng
 
 -- u2 (LDK, HCM, TM) - thấy t1, t3 (không thấy t4 vì group TH, không thấy t5/t6/t7)
-CONNECT u2_ldtm_hcm/U2@2025;
+CONNECT u2_ldtm_hcm/"U2@2025";
 SELECT MATB, SUBSTR(NOIDUNG,1,60) AS NOIDUNG FROM BVADMIN.THONGBAO;
 -- Kết quả mong đợi: TB001 (t1), TB003 (t3)
 
 -- u3 (LDK, HNI, TK) - thấy t1, t3 (t6 yêu cầu group TH, t7 cần HPN)
-CONNECT u3_ldtk_hni/U3@2025;
+CONNECT u3_ldtk_hni/"U3@2025";
 SELECT MATB, SUBSTR(NOIDUNG,1,60) AS NOIDUNG FROM BVADMIN.THONGBAO;
 -- Kết quả mong đợi: TB001 (t1), TB003 (t3)
 
 -- u4 (NV, HCM, TK) - chỉ thấy t1 (group TK, không phải TH)
-CONNECT u4_nvtk_hcm/U4@2025;
+CONNECT u4_nvtk_hcm/"U4@2025";
 SELECT MATB, SUBSTR(NOIDUNG,1,60) AS NOIDUNG FROM BVADMIN.THONGBAO;
 -- Kết quả mong đợi: TB001 (t1)
 
 -- u5 (NV, HCM, TM) - chỉ thấy t1
-CONNECT u5_nvtm_hcm/U5@2025;
+CONNECT u5_nvtm_hcm/"U5@2025";
 SELECT MATB, SUBSTR(NOIDUNG,1,60) AS NOIDUNG FROM BVADMIN.THONGBAO;
 -- Kết quả mong đợi: TB001 (t1)
 
 -- u7 (LDK, mọi cơ sở, mọi khoa) - thấy t1, t3, t4, t5, t6, t7 (trừ t2=BGD)
-CONNECT u7_ldp_all/U7@2025;
+CONNECT u7_ldp_all/"U7@2025";
 SELECT MATB, SUBSTR(NOIDUNG,1,60) AS NOIDUNG FROM BVADMIN.THONGBAO;
 -- Kết quả mong đợi: TB001,TB003,TB004,TB005,TB006,TB007
 
 -- u8 (NV, HNI, TH) - thấy t1 và t6
-CONNECT u8_nvth_hni/U8@2025;
+CONNECT u8_nvth_hni/"U8@2025";
 SELECT MATB, SUBSTR(NOIDUNG,1,60) AS NOIDUNG FROM BVADMIN.THONGBAO;
 -- Kết quả mong đợi: TB001 (t1), TB006 (t6)
 

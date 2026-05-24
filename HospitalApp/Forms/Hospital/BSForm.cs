@@ -1,4 +1,8 @@
+using System.Data;
+using HospitalApp.Controls;
 using HospitalApp.Database;
+using HospitalApp.Security;
+using HospitalApp.Theme;
 using Oracle.ManagedDataAccess.Client;
 
 namespace HospitalApp.Forms.Hospital;
@@ -10,6 +14,7 @@ namespace HospitalApp.Forms.Hospital;
 public class BSForm : Form
 {
     private readonly OracleHelper _db;
+    private readonly SessionManager _session;
     private TabControl _tabs = null!;
 
     // Tab HSBA
@@ -34,24 +39,115 @@ public class BSForm : Form
         MinimumSize = new Size(900, 600);
         BackColor = Color.FromArgb(245, 250, 255);
         BuildUI();
+
+        ShortcutHelper.WireStandard(this,
+            onRefresh: LoadHSBA,
+            onSave:    () => BtnSaveHSBA_Click(null, EventArgs.Empty));
+
+        _session = new SessionManager(this, db.Username);
+        FormClosed += (_, _) => _session.Dispose();
     }
 
     private void BuildUI()
     {
-        var header = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = Color.FromArgb(0, 120, 80) };
-        header.Controls.Add(new Label
-        {
-            Text = "👨‍⚕  Phân hệ 2 – Bác sĩ / Y sĩ",
-            Dock = DockStyle.Fill, ForeColor = Color.White,
-            Font = new Font("Segoe UI", 13, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter
-        });
-        Controls.Add(header);
+        Size = new Size(1280, 780);
+        MinimumSize = new Size(1080, 650);
+        BackColor = UiTheme.BgLight;
 
-        _tabs = new TabControl { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9) };
+        _tabs = new TabControl
+        {
+            Dock = DockStyle.Fill, Font = UiTheme.Body(),
+            Appearance = TabAppearance.FlatButtons,
+            SizeMode = TabSizeMode.Fixed,
+            ItemSize = new Size(0, 1)
+        };
         _tabs.TabPages.Add(BuildHSBATab());
         _tabs.TabPages.Add(BuildBNTab());
         _tabs.TabPages.Add(BuildThongBaoTab());
+        _tabs.TabPages.Add(BuildMyProfileTab());
+
+        var header = BuildAppHeader("Bác sĩ / Y sĩ", "BS", UiTheme.RoleBS);
+
+        var sidebar = new Sidebar { AccentColor = UiTheme.HealthEmerald, Dock = DockStyle.Left };
+        sidebar.AddBrand("HospitalApp", _db.Username);
+        sidebar.AddSection("Khám chữa bệnh");
+        sidebar.AddItem("hsba",    IconRegistry.Document, "Hồ sơ bệnh án");
+        sidebar.AddItem("bn",      IconRegistry.People,   "Bệnh nhân");
+        sidebar.AddSection("Thông tin");
+        sidebar.AddItem("tb",      IconRegistry.Bell,     "Thông báo");
+        sidebar.AddItem("profile", IconRegistry.Person,   "Thông tin của tôi");
+        sidebar.ItemSelected += key =>
+        {
+            _tabs.SelectedIndex = key switch
+            { "hsba" => 0, "bn" => 1, "tb" => 2, "profile" => 3, _ => 0 };
+        };
+
+        var status = new StatusBar
+        {
+            LeftText   = $"{IconRegistry.Database}  {_db.Host}:{_db.Port}/{_db.Sid}",
+            CenterText = $"{_db.Username}  ·  Bác sĩ  ·  {IconRegistry.Shield} VPD enforced"
+        };
+
         Controls.Add(_tabs);
+        Controls.Add(header);
+        Controls.Add(sidebar);
+        Controls.Add(status);
+
+        sidebar.SelectByKey("hsba");
+    }
+
+    private TabPage BuildMyProfileTab()
+    {
+        var p = new TabPage("👤 Thông tin của tôi");
+        p.Controls.Add(new MyProfilePanel(_db));
+        return p;
+    }
+
+    private Panel BuildAppHeader(string title, string roleLabel, Color roleColor)
+    {
+        var header = new Panel
+        {
+            Dock = DockStyle.Top, Height = 60,
+            BackColor = UiTheme.Surface,
+            Padding = new Padding(24, 12, 24, 12)
+        };
+        var lblTitle = new Label
+        {
+            Text = title, Dock = DockStyle.Left, Width = 300,
+            Font = UiTheme.Heading2(), ForeColor = UiTheme.TextDark,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        var roleChip = new RoleChip
+        {
+            Text = roleLabel, AccentColor = roleColor,
+            Anchor = AnchorStyles.Right | AnchorStyles.Top
+        };
+        var btnLogout = new RoundedButton
+        {
+            Text = "Đăng xuất", Glyph = IconRegistry.SignOut,
+            BackColor = UiTheme.BgLight, ForeColor = UiTheme.TextDark,
+            GlyphColor = UiTheme.Danger,
+            Width = 130, Height = 36,
+            Anchor = AnchorStyles.Right | AnchorStyles.Top
+        };
+        btnLogout.Click += (_, _) =>
+        {
+            if (MessageBox.Show("Đăng xuất?", "Xác nhận",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                Close();
+        };
+        void layout()
+        {
+            btnLogout.Location = new Point(header.Width - btnLogout.Width - 16, 12);
+            roleChip.Location  = new Point(btnLogout.Left - roleChip.Width - 12, 17);
+        }
+        header.Resize += (_, _) => layout();
+        roleChip.HandleCreated += (_, _) => layout();
+        header.Controls.Add(roleChip);
+        header.Controls.Add(btnLogout);
+        header.Controls.Add(lblTitle);
+        layout();
+        return header;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -80,7 +176,7 @@ public class BSForm : Form
         var tDetail = new TabPage("📝 Cập nhật HSBA");
         var fl = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
                                        Padding = new Padding(10), AutoScroll = true };
-        _lblHSBAId = new Label { AutoSize = true, Font = new Font("Segoe UI", 9, FontStyle.Bold),
+        _lblHSBAId = new Label { AutoSize = true, Font = UiTheme.LabelBold(),
                                  ForeColor = Color.Navy };
         fl.Controls.Add(_lblHSBAId);
         fl.Controls.Add(new Label { Text = "Chẩn đoán:", AutoSize = true });
@@ -116,10 +212,10 @@ public class BSForm : Form
         var dtBot = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 80, Padding = new Padding(4),
                                           FlowDirection = FlowDirection.LeftToRight };
         dtBot.Controls.Add(new Label { Text = "Thuốc:", AutoSize = true, Padding = new Padding(0, 8, 0, 0) });
-        _txtTenthuoc = new TextBox { Width = 160, Font = new Font("Segoe UI", 9) };
+        _txtTenthuoc = new TextBox { Width = 160, Font = UiTheme.Body() };
         dtBot.Controls.Add(_txtTenthuoc);
         dtBot.Controls.Add(new Label { Text = "Liều:", AutoSize = true, Padding = new Padding(0, 8, 0, 0) });
-        _txtLieudung = new TextBox { Width = 160, Font = new Font("Segoe UI", 9) };
+        _txtLieudung = new TextBox { Width = 160, Font = UiTheme.Body() };
         dtBot.Controls.Add(_txtLieudung);
         var btnAddDT = Btn("➕ Thêm",  Color.SteelBlue);
         var btnDelDT = Btn("🗑 Xóa",   Color.Crimson);
@@ -206,7 +302,8 @@ public class BSForm : Form
                 OracleHelper.Param("d",  _txtDieutri.Text),
                 OracleHelper.Param("k",  _txtKetluan.Text),
                 OracleHelper.Param("id", mahsba));
-            ShowSuccess("Cập nhật HSBA thành công. (Trigger đã ghi vết thay đổi)");
+            AppAuditLogger.Info(_db.Username, "BS.SaveHSBA", $"mahsba={mahsba}");
+            Toast.Show(this, $"Đã cập nhật HSBA {mahsba}", Toast.Kind.Success);
         });
     }
 
@@ -216,8 +313,24 @@ public class BSForm : Form
         {
             var mahsba = ExtractLabel(_lblHSBAId);
             if (string.IsNullOrEmpty(mahsba)) { ShowError("Chọn HSBA."); return; }
-            using var dlg = new AddDVDialog();
+
+            // Load danh sách KTV để dropdown chọn (UX: không phải nhớ MAKTV)
+            var ktvList = _db.Query(
+                "SELECT MANV, MANV||' - '||HOTEN AS DISPLAY " +
+                "FROM BVADMIN.NV_LOOKUP_View WHERE VAITRO='KTV' ORDER BY HOTEN");
+
+            using var dlg = new AddDVDialog(ktvList);
             if (dlg.ShowDialog() != DialogResult.OK) return;
+
+            // Tránh PK collision (MAHSBA, LOAIDV, NGAYDV)
+            var exists = Convert.ToInt32(_db.Scalar(
+                "SELECT COUNT(*) FROM BVADMIN.HSBA_DV " +
+                "WHERE MAHSBA=:h AND LOAIDV=:l AND TRUNC(NGAYDV)=TRUNC(SYSDATE)",
+                OracleHelper.Param("h", mahsba),
+                OracleHelper.Param("l", dlg.LoaiDV)));
+            if (exists > 0)
+            { ShowError($"Dịch vụ '{dlg.LoaiDV}' đã được chỉ định cho HSBA này hôm nay."); return; }
+
             _db.Execute(
                 "INSERT INTO BVADMIN.HSBA_DV(MAHSBA,LOAIDV,NGAYDV,MAKTV) VALUES(:h,:l,SYSDATE,:k)",
                 OracleHelper.Param("h", mahsba),
@@ -234,10 +347,18 @@ public class BSForm : Form
             if (_dgvDV.CurrentRow is null) { ShowError("Chọn DV cần xóa."); return; }
             var mahsba = ExtractLabel(_lblHSBAId);
             var loaidv = _dgvDV.CurrentRow.Cells["LOAIDV"].Value?.ToString();
+
+            if (!ConfirmDeleteDialog.Confirm(this,
+                "Xoá dịch vụ chẩn đoán",
+                $"Sẽ xoá dịch vụ \"{loaidv}\" khỏi HSBA {mahsba}.\n" +
+                $"Thao tác này sẽ được ghi vào nhật ký kiểm toán."))
+                return;
+
             _db.Execute(
                 "DELETE FROM BVADMIN.HSBA_DV WHERE MAHSBA=:h AND LOAIDV=:l",
                 OracleHelper.Param("h", mahsba),
                 OracleHelper.Param("l", loaidv));
+            AppAuditLogger.Warn(_db.Username, "BS.DelDV", $"hsba={mahsba} loaidv={loaidv}");
             DgvHSBA_SelectionChanged(null, EventArgs.Empty);
         });
     }
@@ -246,14 +367,43 @@ public class BSForm : Form
     {
         TryCatch(() =>
         {
-            var mahsba = ExtractLabel(_lblHSBAId);
-            if (string.IsNullOrEmpty(mahsba) || string.IsNullOrEmpty(_txtTenthuoc.Text))
+            var mahsba   = ExtractLabel(_lblHSBAId);
+            var tenthuoc = _txtTenthuoc.Text.Trim();
+            if (string.IsNullOrEmpty(mahsba) || string.IsNullOrEmpty(tenthuoc))
             { ShowError("Chọn HSBA và nhập tên thuốc."); return; }
-            _db.Execute(
-                "INSERT INTO BVADMIN.DONTHUOC VALUES(:h,SYSDATE,:t,:l)",
+
+            // PK DONTHUOC = (MAHSBA, NGAYDT, TENTHUOC) → check trùng trong ngày hôm nay
+            var exists = Convert.ToInt32(_db.Scalar(
+                "SELECT COUNT(*) FROM BVADMIN.DONTHUOC " +
+                "WHERE MAHSBA=:h AND TENTHUOC=:t AND TRUNC(NGAYDT)=TRUNC(SYSDATE)",
                 OracleHelper.Param("h", mahsba),
-                OracleHelper.Param("t", _txtTenthuoc.Text),
-                OracleHelper.Param("l", _txtLieudung.Text));
+                OracleHelper.Param("t", tenthuoc)));
+
+            if (exists > 0)
+            {
+                // Đã có trong ngày → cập nhật liều thay vì insert (tránh PK collision)
+                if (MessageBox.Show(
+                    $"Thuốc '{tenthuoc}' đã được kê trong hôm nay.\nCập nhật liều dùng mới?",
+                    "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+                    != DialogResult.Yes) return;
+
+                _db.Execute(
+                    "UPDATE BVADMIN.DONTHUOC SET LIEUDUNG=:l " +
+                    "WHERE MAHSBA=:h AND TENTHUOC=:t AND TRUNC(NGAYDT)=TRUNC(SYSDATE)",
+                    OracleHelper.Param("l", _txtLieudung.Text),
+                    OracleHelper.Param("h", mahsba),
+                    OracleHelper.Param("t", tenthuoc));
+            }
+            else
+            {
+                _db.Execute(
+                    "INSERT INTO BVADMIN.DONTHUOC(MAHSBA,NGAYDT,TENTHUOC,LIEUDUNG) " +
+                    "VALUES(:h,SYSDATE,:t,:l)",
+                    OracleHelper.Param("h", mahsba),
+                    OracleHelper.Param("t", tenthuoc),
+                    OracleHelper.Param("l", _txtLieudung.Text));
+            }
+
             _txtTenthuoc.Clear(); _txtLieudung.Clear();
             DgvHSBA_SelectionChanged(null, EventArgs.Empty);
         });
@@ -266,10 +416,18 @@ public class BSForm : Form
             if (_dgvDT.CurrentRow is null) { ShowError("Chọn thuốc cần xóa."); return; }
             var mahsba   = ExtractLabel(_lblHSBAId);
             var tenthuoc = _dgvDT.CurrentRow.Cells["TENTHUOC"].Value?.ToString();
+
+            if (!ConfirmDeleteDialog.Confirm(this,
+                "Xoá đơn thuốc",
+                $"Sẽ xoá thuốc \"{tenthuoc}\" khỏi HSBA {mahsba}.\n" +
+                $"FGA sẽ ghi nhận việc xoá đơn thuốc này."))
+                return;
+
             _db.Execute(
                 "DELETE FROM BVADMIN.DONTHUOC WHERE MAHSBA=:h AND TENTHUOC=:t",
                 OracleHelper.Param("h", mahsba),
                 OracleHelper.Param("t", tenthuoc));
+            AppAuditLogger.Warn(_db.Username, "BS.DelDT", $"hsba={mahsba} thuoc={tenthuoc}");
             DgvHSBA_SelectionChanged(null, EventArgs.Empty);
         });
     }
@@ -293,7 +451,7 @@ public class BSForm : Form
 
         var fl = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
                                        Padding = new Padding(10), AutoScroll = true };
-        _lblBNId = new Label { AutoSize = true, Font = new Font("Segoe UI", 9, FontStyle.Bold), ForeColor = Color.Navy };
+        _lblBNId = new Label { AutoSize = true, Font = UiTheme.LabelBold(), ForeColor = Color.Navy };
         fl.Controls.Add(_lblBNId);
         fl.Controls.Add(new Label { Text = "Tiền sử bệnh:", AutoSize = true });
         _txtTSB = TB(600, 60); fl.Controls.Add(_txtTSB);
@@ -316,6 +474,7 @@ public class BSForm : Form
         TryCatch(() =>
         {
             // VPD filter: chỉ trả BN liên quan đến HSBA của BS này
+            // Note: CCCD không hiển thị ở grid để hạn chế lộ thông tin nhạy cảm
             _dgvBN.DataSource = _db.Query(
                 "SELECT MABN, TENBN, PHAI, TO_CHAR(NGAYSINH,'DD/MM/YYYY') AS NGAYSINH, " +
                 "TINHTP FROM BVADMIN.BENHNHAN ORDER BY TENBN");
@@ -364,12 +523,22 @@ public class BSForm : Form
     private TabPage BuildThongBaoTab()
     {
         var page = new TabPage("📢 Thông báo");
+        var lblLabel = new Label
+        {
+            Dock = DockStyle.Top,
+            Height = 28,
+            Padding = new Padding(8, 6, 0, 0),
+            Font = UiTheme.LabelBold(),
+            ForeColor = Color.FromArgb(0, 80, 60),
+            Text = "Nhãn OLS: (chưa tải)"
+        };
         var dgv  = MakeGrid(); dgv.Dock = DockStyle.Fill;
         var btn  = Btn("🔄 Tải thông báo", Color.SteelBlue); btn.Dock = DockStyle.Top;
         btn.Click += (_, _) =>
         {
             TryCatch(() =>
             {
+                lblLabel.Text = "Nhãn OLS: " + CurrentOlsLabel();
                 // OLS tự filter: BS chỉ thấy thông báo phù hợp với nhãn của mình
                 dgv.DataSource = _db.Query(
                     "SELECT MATB, SUBSTR(TO_CHAR(NOIDUNG),1,100) AS NOIDUNG, " +
@@ -378,6 +547,7 @@ public class BSForm : Form
             });
         };
         page.Controls.Add(dgv);
+        page.Controls.Add(lblLabel);
         page.Controls.Add(btn);
         return page;
     }
@@ -393,12 +563,12 @@ public class BSForm : Form
 
     private static TextBox TB(int width, int height = 24) =>
         new() { Multiline = height > 24, Width = width, Height = height,
-                Font = new Font("Segoe UI", 9), ScrollBars = height > 24 ? ScrollBars.Vertical : ScrollBars.None };
+                Font = UiTheme.Body(), ScrollBars = height > 24 ? ScrollBars.Vertical : ScrollBars.None };
 
     private static Button Btn(string text, Color color, int width = 140) =>
         new() { Text = text, Width = width, Height = 32, BackColor = color,
                 ForeColor = Color.White, FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9), Cursor = Cursors.Hand };
+                Font = UiTheme.Body(), Cursor = Cursors.Hand };
 
     private static string ExtractLabel(Label lbl)
     {
@@ -406,10 +576,15 @@ public class BSForm : Form
         return parts.Length > 1 ? parts[1].Trim() : "";
     }
 
-    private static void TryCatch(Action a)
+    private void TryCatch(Action a, [System.Runtime.CompilerServices.CallerMemberName] string caller = "")
     {
         try { a(); }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        catch (Exception ex)
+        {
+            AppAuditLogger.Error(_db.Username, $"BS.{caller}", ex.Message);
+            MessageBox.Show(OracleErrorMapper.Friendly(ex), "Lỗi",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     private static void ShowSuccess(string m) =>
@@ -417,6 +592,18 @@ public class BSForm : Form
 
     private static void ShowError(string m) =>
         MessageBox.Show(m, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+    private string CurrentOlsLabel()
+    {
+        try
+        {
+            return _db.Scalar(
+                "SELECT NVL(MAX(LABEL), '(chưa gán)') " +
+                "FROM DBA_SA_USER_LABELS " +
+                "WHERE POLICY_NAME='BV_LABEL_POLICY' AND USER_NAME=USER")?.ToString() ?? "(chưa gán)";
+        }
+        catch { return "(không đọc được DBA_SA_USER_LABELS)"; }
+    }
 }
 
 // ── Dialog thêm DV ────────────────────────────────────────────────────────────
@@ -425,29 +612,61 @@ internal class AddDVDialog : Form
     public string LoaiDV { get; private set; } = "";
     public string MaKTV  { get; private set; } = "";
 
-    public AddDVDialog()
+    private static readonly string[] _commonLoaiDV =
+    {
+        "Xét nghiệm máu tổng quát", "Xét nghiệm nước tiểu", "Siêu âm tim",
+        "Siêu âm bụng", "X-quang ngực", "CT scan", "MRI", "Điện não đồ",
+        "Đo chức năng hô hấp", "Nội soi tiêu hóa", "Điện tim"
+    };
+
+    public AddDVDialog(System.Data.DataTable ktvList)
     {
         Text = "Thêm Dịch vụ chẩn đoán";
-        Size = new Size(380, 200);
+        Size = new Size(420, 230);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false; MinimizeBox = false;
 
-        var loai = new TextBox { Location = new Point(120, 20), Width = 200 };
-        var maktv= new TextBox { Location = new Point(120, 60), Width = 200 };
-        var ok   = new Button  { Text = "Thêm", Location = new Point(100, 110), Width = 80,
-                                  DialogResult = DialogResult.OK };
-        var cancel = new Button { Text = "Hủy", Location = new Point(200, 110), Width = 80,
-                                   DialogResult = DialogResult.Cancel };
+        var cbLoai = new ComboBox
+        {
+            Location = new Point(120, 20), Width = 260,
+            DropDownStyle = ComboBoxStyle.DropDown
+        };
+        cbLoai.Items.AddRange(_commonLoaiDV);
+
+        var cbKtv = new ComboBox
+        {
+            Location = new Point(120, 60), Width = 260,
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            DisplayMember = "DISPLAY", ValueMember = "MANV",
+            DataSource = ktvList
+        };
+
+        var ok = new Button
+        {
+            Text = "Thêm", Location = new Point(140, 130), Width = 90, Height = 32,
+            DialogResult = DialogResult.OK
+        };
+        var cancel = new Button
+        {
+            Text = "Hủy", Location = new Point(250, 130), Width = 90, Height = 32,
+            DialogResult = DialogResult.Cancel
+        };
 
         Controls.AddRange(new Control[]
         {
             new Label { Text = "Loại DV:", Location = new Point(20, 23), AutoSize = true },
-            loai,
+            cbLoai,
             new Label { Text = "Mã KTV:", Location = new Point(20, 63), AutoSize = true },
-            maktv, ok, cancel
+            cbKtv, ok, cancel
         });
 
         AcceptButton = ok;
-        ok.Click += (_, _) => { LoaiDV = loai.Text; MaKTV = maktv.Text; };
+        CancelButton = cancel;
+        ok.Click += (_, _) =>
+        {
+            LoaiDV = cbLoai.Text.Trim();
+            MaKTV  = cbKtv.SelectedValue?.ToString() ?? "";
+        };
     }
 }

@@ -17,16 +17,23 @@ public class OracleHelper
     public string Port     { get; }
     public string Sid      { get; }
 
-    public OracleHelper(string host, string port, string sid, string username, string password)
+    public OracleHelper(string host, string port, string serviceName, string username, string password)
     {
         Host     = host;
         Port     = port;
-        Sid      = sid;
+        Sid      = serviceName;
         Username = username.ToUpper();
 
+        // Connection string thuần, password được quote bằng `"..."` nếu chứa ký tự đặc biệt
+        // (Oracle managed driver chấp nhận quoted password để chứa ; = @ ! ' v.v.)
+        var safePass = password.Contains('"') || password.Contains(';') ||
+                       password.Contains('=') || password.Contains('@')
+            ? "\"" + password.Replace("\"", "\"\"") + "\""
+            : password;
+
         _connStr = $"Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)" +
-                   $"(HOST={host})(PORT={port}))(CONNECT_DATA=(SID={sid})));" +
-                   $"User Id={username};Password={password};Connection Timeout=10;";
+                   $"(HOST={host})(PORT={port}))(CONNECT_DATA=(SERVICE_NAME={serviceName})));" +
+                   $"User Id={username};Password={safePass};Connection Timeout=10;";
     }
 
     // ── Kết nối + test ────────────────────────────────────────────────────────
@@ -126,8 +133,27 @@ public class OracleHelper
                 Scalar("SELECT COUNT(*) FROM BVADMIN.BENHNHAN " +
                        "WHERE ORACLE_USER = SYS_CONTEXT('USERENV','SESSION_USER')"));
             if (bnCount > 0) return "BN";
+
+            // Kiểm tra OLS user (u1-u8): có nhãn trong DBA_SA_USER_LABELS
+            try
+            {
+                var olsCount = Convert.ToInt32(Scalar(
+                    "SELECT COUNT(*) FROM DBA_SA_USER_LABELS " +
+                    "WHERE POLICY_NAME = 'BV_LABEL_POLICY' AND USER_NAME = USER"));
+                if (olsCount > 0) return "OLS";
+            }
+            catch { /* DBA_SA_* có thể không tồn tại nếu chưa cài OLS */ }
         }
         catch { /* ignore */ }
+
+        // Demo fallback: Oracle XE setup may restrict direct role-detection queries.
+        // The DB policies still enforce data access after the form opens.
+        if (Username.StartsWith("DPV_", StringComparison.OrdinalIgnoreCase)) return "DPV";
+        if (Username.StartsWith("BS_",  StringComparison.OrdinalIgnoreCase)) return "BS";
+        if (Username.StartsWith("KTV_", StringComparison.OrdinalIgnoreCase)) return "KTV";
+        if (Username.StartsWith("BN_",  StringComparison.OrdinalIgnoreCase)) return "BN";
+        if (Username.StartsWith("U",   StringComparison.OrdinalIgnoreCase)) return "OLS";
+
         return IsDba() ? "DBA" : "UNKNOWN";
     }
 

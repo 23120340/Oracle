@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 -- PHÂN HỆ 2 - File 06: Yêu cầu 3 - Cơ chế Kiểm toán (Audit)
 -- ============================================================
 -- 1. Kích hoạt kiểm toán hệ thống
@@ -35,26 +35,39 @@ AUDIT SESSION;
 -- ============================================================
 CONNECT SYSTEM/oracle;
 
+-- ════════════════════════════════════════════════════════════════════════════
+-- Spec yêu cầu: Standard Audit "theo dõi hành vi của những USER CỤ THỂ
+-- trên những đối tượng cụ thể". Vì vậy dùng AUDIT BY <username>.
+-- ════════════════════════════════════════════════════════════════════════════
+
 -- --- Ngữ cảnh 1 ---
--- Theo dõi mọi SELECT trên BENHNHAN (phát hiện truy cập trái phép dữ liệu BN)
--- Theo dõi cả thành công và thất bại
-AUDIT SELECT ON BVADMIN.BENHNHAN BY ACCESS WHENEVER NOT SUCCESSFUL;
-AUDIT SELECT ON BVADMIN.BENHNHAN BY ACCESS WHENEVER SUCCESSFUL;
+-- DPV_NV001 truy cập BENHNHAN (đúng vai trò) - log cả thành công lẫn thất bại
+-- để giám sát hoạt động hàng ngày + phát hiện thử nghiệm vượt quyền
+AUDIT SELECT, INSERT, UPDATE ON BVADMIN.BENHNHAN
+    BY DPV_NV001 BY ACCESS;
 
 -- --- Ngữ cảnh 2 ---
--- Theo dõi UPDATE trên HSBA bởi tất cả user (ghi vết thay đổi HSBA)
-AUDIT UPDATE ON BVADMIN.HSBA BY ACCESS;
+-- BS_NV003 cập nhật HSBA - theo dõi tất cả thay đổi chẩn đoán/điều trị
+-- (kết hợp với FGA bên dưới để có audit chi tiết)
+AUDIT UPDATE ON BVADMIN.HSBA
+    BY BS_NV003 BY ACCESS WHENEVER SUCCESSFUL;
+AUDIT UPDATE ON BVADMIN.HSBA
+    BY BS_NV003 BY ACCESS WHENEVER NOT SUCCESSFUL;
 
 -- --- Ngữ cảnh 3 ---
--- Theo dõi INSERT/DELETE trên HSBA_DV (thêm/xóa dịch vụ chẩn đoán)
-AUDIT INSERT, DELETE ON BVADMIN.HSBA_DV BY ACCESS;
+-- KTV_NV006 cập nhật KETQUA trên HSBA_DV
+-- Đặc biệt theo dõi thao tác KHÔNG thành công (cố vượt quyền)
+AUDIT SELECT, UPDATE ON BVADMIN.HSBA_DV
+    BY KTV_NV006 BY ACCESS WHENEVER NOT SUCCESSFUL;
 
 -- --- Ngữ cảnh 4 ---
--- Theo dõi các thao tác trên DONTHUOC (an toàn đơn thuốc)
-AUDIT INSERT, UPDATE, DELETE ON BVADMIN.DONTHUOC BY ACCESS;
+-- BN_BN001 - bệnh nhân tự cập nhật thông tin
+-- Theo dõi để phát hiện hành vi bất thường (vd. cố sửa CCCD/TENBN)
+AUDIT UPDATE ON BVADMIN.BENHNHAN
+    BY BN_BN001 BY ACCESS WHENEVER NOT SUCCESSFUL;
 
 -- --- Ngữ cảnh 5 ---
--- Theo dõi kết nối không thành công của tất cả user (phát hiện tấn công brute-force)
+-- Mọi kết nối không thành công (phát hiện brute-force toàn hệ thống)
 AUDIT CREATE SESSION WHENEVER NOT SUCCESSFUL;
 
 -- Kiểm tra audit đã cấu hình
@@ -70,7 +83,7 @@ ORDER  BY OBJECT_NAME;
 CONNECT SYSTEM/oracle;
 GRANT EXECUTE ON DBMS_FGA TO BVADMIN;
 
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 
 -- --- FGA 3a ---
 -- Ghi vết UPDATE TENTHUOC hoặc LIEUDUNG trong DONTHUOC
@@ -123,7 +136,7 @@ AUDIT UPDATE(KETLUAN)  ON BVADMIN.HSBA BY ACCESS WHENEVER NOT SUCCESSFUL;
 
 -- Kết hợp FGA: audit khi user KHÔNG phải BS mà vẫn UPDATE thành công
 -- (trường hợp bỏ qua VPD - cần ghi vết)
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 BEGIN
     DBMS_FGA.ADD_POLICY(
         object_schema   => 'BVADMIN',
@@ -161,7 +174,7 @@ END;
 -- ============================================================
 
 -- Tình huống A: BS_NV003 cập nhật CHANDOAN (hợp lệ - trigger + FGA ghi vết)
-CONNECT BS_NV003/BV@2025!;
+CONNECT BS_NV003/"BV@2025!";
 UPDATE BVADMIN.HSBA
 SET    CHANDOAN = N'Đái tháo đường type 2 có biến chứng thận - cập nhật lần 2'
 WHERE  MAHSBA = 'HS001';
@@ -174,14 +187,14 @@ WHERE  MAHSBA = 'HS001' AND TENTHUOC = N'Metformin 500mg';
 COMMIT;
 
 -- Tình huống C: DPV_NV001 cố UPDATE CHANDOAN (thất bại - Standard Audit 3c ghi lỗi)
-CONNECT DPV_NV001/BV@2025!;
+CONNECT DPV_NV001/"BV@2025!";
 UPDATE BVADMIN.HSBA
 SET    CHANDOAN = N'DPV cố thay đổi - bất hợp pháp'
 WHERE  MAHSBA = 'HS001';
 -- Lỗi: ORA-01031: insufficient privileges → ghi vào DBA_AUDIT_TRAIL
 
 -- Tình huống D: KTV_NV006 cố DELETE trên HSBA_DV (thất bại - FGA 3d ghi vết)
-CONNECT KTV_NV006/BV@2025!;
+CONNECT KTV_NV006/"BV@2025!";
 DELETE FROM BVADMIN.HSBA_DV WHERE MAHSBA = 'HS001';
 -- Lỗi: ORA-01031 (KTV không có DELETE) → ghi vào DBA_FGA_AUDIT_TRAIL
 
@@ -249,7 +262,7 @@ WHERE  POLICY_NAME = 'FGA_HSBA_DV_ILLEGAL'
 ORDER  BY EXTENDED_TIMESTAMP DESC;
 
 -- 5.6 Xem log trigger (bảng tự tạo trong file 04)
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 
 -- Log thay đổi HSBA bởi BS
 SELECT MAHSBA, COT_THAYDO, BS_THUCHIN,

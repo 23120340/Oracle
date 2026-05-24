@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 -- PHÂN HỆ 2 - Ứng dụng Quản lý Dữ liệu Y tế
 -- File 01: Tạo Schema và Dữ liệu mẫu
 -- Chạy với quyền DBA (SYSTEM/SYS)
@@ -7,7 +7,7 @@
 -- ============================================================
 -- BƯỚC 1: Tạo schema owner cho bệnh viện
 -- ============================================================
-CREATE USER BVADMIN IDENTIFIED BY BVAdmin@2025
+CREATE USER BVADMIN IDENTIFIED BY "BVAdmin@2025"
     DEFAULT TABLESPACE USERS
     QUOTA UNLIMITED ON USERS;
 
@@ -23,7 +23,7 @@ GRANT EXECUTE ON DBMS_SESSION        TO BVADMIN;
 -- ============================================================
 -- BƯỚC 2: Tạo bảng dữ liệu (chạy bởi BVADMIN)
 -- ============================================================
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 
 -- BỆNHNHÂN: thông tin bệnh nhân
 -- Cột ORACLE_USER: lưu tên tài khoản Oracle → kết nối 1 bảng (TC#1)

@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 -- PHÂN HỆ 2 - File 04: Yêu cầu 1, Câu 3 - VPD cho DPV và Bác sĩ
 -- ============================================================
 -- TC#2 (Điều phối viên - DPV):
@@ -21,7 +21,7 @@
 -- Chạy với BVADMIN sau 01, 02, 03
 -- ============================================================
 
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 
 -- ============================================================
 -- PHẦN A: ROLES VÀ GRANTS CƠ BẢN CHO DPV VÀ BS
@@ -56,7 +56,7 @@ GRANT BS_Role  TO BS_NV003, BS_NV004, BS_NV005;
 -- ============================================================
 -- PHẦN B: VPD POLICY FUNCTIONS (tạo bởi BVADMIN)
 -- ============================================================
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 
 -- B1. Policy function cho HSBA
 --     - DPV: thấy tất cả HSBA (không filter)
@@ -155,7 +155,7 @@ END vpd_donthuoc;
 CONNECT SYSTEM/oracle;
 GRANT EXECUTE ON DBMS_RLS TO BVADMIN;
 
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 
 -- Áp dụng VPD cho bảng HSBA
 DBMS_RLS.ADD_POLICY(
@@ -208,7 +208,7 @@ DBMS_RLS.ADD_POLICY(
 -- ============================================================
 -- PHẦN D: AUDIT TRIGGER - ghi vết UPDATE CHANDOAN/DIEUTRI/KETLUAN (TC#3c)
 -- ============================================================
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 
 -- Bảng log ghi vết thay đổi HSBA (CHANDOAN, DIEUTRI, KETLUAN)
 CREATE TABLE LOG_BS_HSBA (
@@ -282,7 +282,7 @@ END trg_log_donthuoc;
 -- ============================================================
 
 -- Test BS_NV003 (bác sĩ Tim mạch, phụ trách HS001 và HS004):
-CONNECT BS_NV003/BV@2025!;
+CONNECT BS_NV003/"BV@2025!";
 SELECT * FROM SESSION_ROLES;
 
 -- Test SELECT HSBA: chỉ thấy HS001 và HS004 (MABS='NV003')
@@ -310,7 +310,7 @@ INSERT INTO BVADMIN.DONTHUOC VALUES('HS001', DATE'2025-04-20', N'Atorvastatin 20
 COMMIT;
 
 -- Test DPV_NV001:
-CONNECT DPV_NV001/BV@2025!;
+CONNECT DPV_NV001/"BV@2025!";
 
 -- DPV thấy TẤT CẢ HSBA (VPD trả về '1=1' cho DPV)
 SELECT MAHSBA, MABN, MABS, MAKHOA FROM BVADMIN.HSBA;
@@ -327,7 +327,7 @@ UPDATE BVADMIN.HSBA SET CHANDOAN = N'DPV không được sửa' WHERE MAHSBA = '
 -- Lỗi: ORA-01031
 
 -- Xem log audit sau test (BVADMIN)
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 
 SELECT MAHSBA, COT_THAYDO, BS_THUCHIN, THOI_GIAN,
        SUBSTR(TO_CHAR(GIA_TRI_CU), 1, 50) AS CU,

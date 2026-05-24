@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 -- PHÂN HỆ 2 - File 02: Thiết lập tài khoản (TC#1)
 -- ============================================================
 -- TC#1 yêu cầu:
@@ -25,12 +25,12 @@ GRANT GRANT ANY ROLE TO BVADMIN;
 -- Procedure tạo tài khoản cho NHÂN VIÊN
 -- Nhận MANV, tự sinh username và password, cập nhật ORACLE_USER
 -- ============================================================
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 
-CREATE OR REPLACE PROCEDURE sp_create_nhanvien_account(
-    p_manv   IN NHANVIEN.MANV%TYPE,
+CREATE OR REPLACE PROCEDURE BVADMIN.sp_create_nhanvien_account(
+    p_manv   IN BVADMIN.NHANVIEN.MANV%TYPE,
     p_passwd IN VARCHAR2 DEFAULT 'BV@2025!'
-) AUTHID CURRENT_USER AS
+) AUTHID DEFINER AS
     v_username VARCHAR2(100);
     v_hoten    NVARCHAR2(100);
     v_vaitro   VARCHAR2(20);
@@ -38,7 +38,7 @@ CREATE OR REPLACE PROCEDURE sp_create_nhanvien_account(
 BEGIN
     -- Lấy thông tin nhân viên
     SELECT HOTEN, VAITRO INTO v_hoten, v_vaitro
-    FROM NHANVIEN WHERE MANV = p_manv;
+    FROM BVADMIN.NHANVIEN WHERE MANV = p_manv;
 
     -- Tạo username: role_manv, ví dụ: BS_NV003
     v_username := v_vaitro || '_' || p_manv;
@@ -54,7 +54,7 @@ BEGIN
     EXECUTE IMMEDIATE 'GRANT CREATE SESSION TO ' || v_username;
 
     -- Cập nhật ORACLE_USER trong NHANVIEN (liên kết 1 bảng - TC#1)
-    UPDATE NHANVIEN
+    UPDATE BVADMIN.NHANVIEN
     SET    ORACLE_USER = v_username
     WHERE  MANV = p_manv;
 
@@ -70,10 +70,10 @@ END;
 -- ============================================================
 -- Procedure tạo tài khoản cho BỆNH NHÂN
 -- ============================================================
-CREATE OR REPLACE PROCEDURE sp_create_benhnhan_account(
-    p_mabn   IN BENHNHAN.MABN%TYPE,
+CREATE OR REPLACE PROCEDURE BVADMIN.sp_create_benhnhan_account(
+    p_mabn   IN BVADMIN.BENHNHAN.MABN%TYPE,
     p_passwd IN VARCHAR2 DEFAULT 'BV@2025!'
-) AUTHID CURRENT_USER AS
+) AUTHID DEFINER AS
     v_username VARCHAR2(100);
     v_sql      VARCHAR2(500);
 BEGIN
@@ -88,7 +88,7 @@ BEGIN
     EXECUTE IMMEDIATE 'GRANT CREATE SESSION TO ' || v_username;
 
     -- Cập nhật ORACLE_USER trong BENHNHAN (liên kết 1 bảng - TC#1)
-    UPDATE BENHNHAN
+    UPDATE BVADMIN.BENHNHAN
     SET    ORACLE_USER = v_username
     WHERE  MABN = p_mabn;
 
@@ -106,18 +106,18 @@ END;
 -- ============================================================
 SET SERVEROUTPUT ON;
 
-EXEC sp_create_nhanvien_account('NV001');  -- DPV_NV001
-EXEC sp_create_nhanvien_account('NV002');  -- DPV_NV002
-EXEC sp_create_nhanvien_account('NV003');  -- BS_NV003
-EXEC sp_create_nhanvien_account('NV004');  -- BS_NV004
-EXEC sp_create_nhanvien_account('NV005');  -- BS_NV005
-EXEC sp_create_nhanvien_account('NV006');  -- KTV_NV006
-EXEC sp_create_nhanvien_account('NV007');  -- KTV_NV007
+EXEC BVADMIN.sp_create_nhanvien_account('NV001');  -- DPV_NV001
+EXEC BVADMIN.sp_create_nhanvien_account('NV002');  -- DPV_NV002
+EXEC BVADMIN.sp_create_nhanvien_account('NV003');  -- BS_NV003
+EXEC BVADMIN.sp_create_nhanvien_account('NV004');  -- BS_NV004
+EXEC BVADMIN.sp_create_nhanvien_account('NV005');  -- BS_NV005
+EXEC BVADMIN.sp_create_nhanvien_account('NV006');  -- KTV_NV006
+EXEC BVADMIN.sp_create_nhanvien_account('NV007');  -- KTV_NV007
 
 -- Tạo tài khoản cho bệnh nhân mẫu
-EXEC sp_create_benhnhan_account('BN001');  -- BN_BN001
-EXEC sp_create_benhnhan_account('BN002');  -- BN_BN002
-EXEC sp_create_benhnhan_account('BN003');  -- BN_BN003
+EXEC BVADMIN.sp_create_benhnhan_account('BN001');  -- BN_BN001
+EXEC BVADMIN.sp_create_benhnhan_account('BN002');  -- BN_BN002
+EXEC BVADMIN.sp_create_benhnhan_account('BN003');  -- BN_BN003
 
 -- ============================================================
 -- Kiểm chứng TC#1: kết nối 1 tài khoản với 1 dòng dữ liệu
@@ -139,14 +139,14 @@ SELECT MABN, TENBN, ORACLE_USER FROM BVADMIN.BENHNHAN;
 -- ============================================================
 -- Helper functions - dùng chung cho RBAC/VPD (chạy bởi BVADMIN)
 -- ============================================================
-CONNECT BVADMIN/BVAdmin@2025;
+CONNECT BVADMIN/"BVAdmin@2025";
 
 -- Lấy MANV của user đang đăng nhập
-CREATE OR REPLACE FUNCTION fn_get_manv RETURN VARCHAR2 AS
-    v_manv NHANVIEN.MANV%TYPE;
+CREATE OR REPLACE FUNCTION BVADMIN.fn_get_manv RETURN VARCHAR2 AS
+    v_manv BVADMIN.NHANVIEN.MANV%TYPE;
 BEGIN
     SELECT MANV INTO v_manv
-    FROM   NHANVIEN
+    FROM   BVADMIN.NHANVIEN
     WHERE  ORACLE_USER = SYS_CONTEXT('USERENV','SESSION_USER');
     RETURN v_manv;
 EXCEPTION
@@ -155,11 +155,11 @@ END fn_get_manv;
 /
 
 -- Lấy VAITRO của user đang đăng nhập
-CREATE OR REPLACE FUNCTION fn_get_vaitro RETURN VARCHAR2 AS
-    v_vaitro NHANVIEN.VAITRO%TYPE;
+CREATE OR REPLACE FUNCTION BVADMIN.fn_get_vaitro RETURN VARCHAR2 AS
+    v_vaitro BVADMIN.NHANVIEN.VAITRO%TYPE;
 BEGIN
     SELECT VAITRO INTO v_vaitro
-    FROM   NHANVIEN
+    FROM   BVADMIN.NHANVIEN
     WHERE  ORACLE_USER = SYS_CONTEXT('USERENV','SESSION_USER');
     RETURN v_vaitro;
 EXCEPTION
@@ -168,11 +168,11 @@ END fn_get_vaitro;
 /
 
 -- Lấy MABN của bệnh nhân đang đăng nhập
-CREATE OR REPLACE FUNCTION fn_get_mabn RETURN VARCHAR2 AS
-    v_mabn BENHNHAN.MABN%TYPE;
+CREATE OR REPLACE FUNCTION BVADMIN.fn_get_mabn RETURN VARCHAR2 AS
+    v_mabn BVADMIN.BENHNHAN.MABN%TYPE;
 BEGIN
     SELECT MABN INTO v_mabn
-    FROM   BENHNHAN
+    FROM   BVADMIN.BENHNHAN
     WHERE  ORACLE_USER = SYS_CONTEXT('USERENV','SESSION_USER');
     RETURN v_mabn;
 EXCEPTION
@@ -180,6 +180,6 @@ EXCEPTION
 END fn_get_mabn;
 /
 
-GRANT EXECUTE ON fn_get_manv   TO PUBLIC;
-GRANT EXECUTE ON fn_get_vaitro TO PUBLIC;
-GRANT EXECUTE ON fn_get_mabn   TO PUBLIC;
+GRANT EXECUTE ON BVADMIN.fn_get_manv   TO PUBLIC;
+GRANT EXECUTE ON BVADMIN.fn_get_vaitro TO PUBLIC;
+GRANT EXECUTE ON BVADMIN.fn_get_mabn   TO PUBLIC;
