@@ -177,8 +177,8 @@ public static class UiTheme
         var b = new Button
         {
             Text       = text,
-            Height     = 34,
-            MinimumSize= new Size(110, 34),
+            Height     = 38,
+            MinimumSize= new Size(112, 38),
             BackColor  = bg,
             ForeColor  = Color.White,
             FlatStyle  = FlatStyle.Flat,
@@ -186,7 +186,9 @@ public static class UiTheme
             Cursor     = Cursors.Hand,
             AutoSize   = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            Padding    = new Padding(12, 4, 12, 4)
+            Padding    = new Padding(14, 0, 14, 0),
+            TextAlign  = ContentAlignment.MiddleCenter,
+            UseCompatibleTextRendering = false
         };
         b.FlatAppearance.BorderSize  = 0;
         b.FlatAppearance.MouseOverBackColor = border;
@@ -196,7 +198,7 @@ public static class UiTheme
 
     public static TextBox TextField(int width = 220) => new()
     {
-        Width = width, Height = 26,
+        Width = width, Height = 30,
         Font = Body(),
         BorderStyle = BorderStyle.FixedSingle
     };
@@ -220,19 +222,23 @@ public static class UiTheme
     public static DataGridView Grid() => new()
     {
         ReadOnly = true, AllowUserToAddRows = false,
-        AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells,
+        AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
         SelectionMode = DataGridViewSelectionMode.FullRowSelect,
         BackgroundColor = Surface,
         RowHeadersVisible = false,
         Font = Body(),
         EnableHeadersVisualStyles = false,
         BorderStyle = BorderStyle.None,
+        CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+        ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single,
+        ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
+        ColumnHeadersHeight = 34,
         ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
         {
-            BackColor = BgLight,
+            BackColor = Color.FromArgb(241, 245, 249),
             ForeColor = TextDark,
             Font      = BodyBold(),
-            Padding   = new Padding(6, 4, 6, 4),
+            Padding   = new Padding(8, 6, 8, 6),
             Alignment = DataGridViewContentAlignment.MiddleLeft
         },
         DefaultCellStyle = new DataGridViewCellStyle
@@ -241,27 +247,34 @@ public static class UiTheme
             ForeColor       = TextDark,
             SelectionBackColor = Color.FromArgb(220, 235, 250),
             SelectionForeColor = TextDark,
-            Padding         = new Padding(4, 2, 4, 2)
+            Padding         = new Padding(8, 4, 8, 4)
+        },
+        AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle
+        {
+            BackColor = Color.FromArgb(250, 252, 255)
         },
         GridColor = Border,
-        RowTemplate = { Height = 28 }
+        RowTemplate = { Height = 32 }
     };
 
     public static Panel Header(string title, Color bg, Color btnDark,
                                EventHandler? onLogout = null)
     {
         var p = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = bg };
-        p.Controls.Add(new Label
+        var titleLabel = new Label
         {
             Text = title,
             Dock = DockStyle.Fill,
             ForeColor = Color.White,
             Font = Heading2(),
-            TextAlign = ContentAlignment.MiddleCenter
-        });
+            TextAlign = ContentAlignment.MiddleCenter,
+            AutoEllipsis = true,
+            Padding = new Padding(12, 0, onLogout == null ? 12 : 152, 0)
+        };
+        Button? btn = null;
         if (onLogout != null)
         {
-            var btn = new Button
+            btn = new Button
             {
                 Text = "⏻  Đăng xuất",
                 Dock = DockStyle.Right, Width = 140,
@@ -273,6 +286,8 @@ public static class UiTheme
             btn.Click += onLogout;
             p.Controls.Add(btn);
         }
+        p.Controls.Add(titleLabel);
+        btn?.BringToFront();
         return p;
     }
 }

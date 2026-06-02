@@ -29,7 +29,7 @@ public class DPVForm : Form
     private DataGridView _dgvHSBA = null!;
     private Label _lblHSBAInfo = null!;
     private ComboBox _cmbBNForHSBA = null!, _cmbBS = null!;
-    private TextBox _txtMakhoa = null!;
+    private ComboBox _cmbKhoa = null!;
     private Button _btnCreateHSBA = null!, _btnAssignBS = null!,
                    _btnAssignKTV  = null!;
     private DataGridView _dgvDV = null!;
@@ -107,6 +107,7 @@ public class DPVForm : Form
         _tabs.TabPages.Add(BuildHSBATab());
         _tabs.TabPages.Add(BuildThongBaoTab());
         _tabs.TabPages.Add(BuildMyProfileTab());
+        // Audit là chức năng của DBA (Yêu cầu 3 spec) — không cấp cho DPV
 
         var header = BuildAppHeader("Điều phối viên", "ĐPV", UiTheme.RoleDPV);
 
@@ -136,6 +137,15 @@ public class DPVForm : Form
         Controls.Add(status);
 
         sidebar.SelectByKey("bn");
+
+        // Force load lookup data ngay khi form hiện ra (không chờ tab.Enter)
+        Shown += (_, _) =>
+        {
+            LoadBN();
+            LoadHSBA();
+            LoadBSList();
+            LoadBNList();
+        };
     }
 
     private TabPage BuildMyProfileTab()
@@ -157,7 +167,8 @@ public class DPVForm : Form
         {
             Text = title, Dock = DockStyle.Left, Width = 300,
             Font = UiTheme.Heading2(), ForeColor = UiTheme.TextDark,
-            TextAlign = ContentAlignment.MiddleLeft
+            TextAlign = ContentAlignment.MiddleLeft,
+            AutoEllipsis = true
         };
         var roleChip = new RoleChip
         {
@@ -183,6 +194,7 @@ public class DPVForm : Form
             // Logout button luôn ở phải, chip nằm bên trái logout — không overlap
             btnLogout.Location = new Point(header.Width - btnLogout.Width - 16, 12);
             roleChip.Location  = new Point(btnLogout.Left - roleChip.Width - 12, 17);
+            lblTitle.Width = Math.Max(140, roleChip.Left - lblTitle.Left - 16);
         }
         header.Resize += (_, _) => layout();
         // Chip width tính lại sau khi đo text
@@ -208,7 +220,9 @@ public class DPVForm : Form
         var toolBN = new FlowLayoutPanel
         {
             Dock = DockStyle.Top, Height = 44, Padding = new Padding(4),
-            FlowDirection = FlowDirection.LeftToRight
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            AutoScroll = true
         };
         _btnNewBN = Btn("Thêm BN", UiTheme.HealthGreen);
         _btnNewBN.Click += (_, _) => { _isNewBN = true; ClearBNForm(); };
@@ -220,8 +234,23 @@ public class DPVForm : Form
         // Attach sau khi LoadBN có DataTable
         _dgvBN.DataBindingComplete += (_, _) => search.AttachTo(_dgvBN, "TENBN", "MABN", "CCCD");
 
-        split.Panel1.Controls.Add(_dgvBN);
-        split.Panel1.Controls.Add(toolBN);
+        var leftLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        leftLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        leftLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        leftLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        toolBN.Dock = DockStyle.Fill;
+        toolBN.Margin = Padding.Empty;
+        _dgvBN.Margin = Padding.Empty;
+        leftLayout.Controls.Add(toolBN, 0, 0);
+        leftLayout.Controls.Add(_dgvBN, 0, 1);
+        split.Panel1.Controls.Add(leftLayout);
 
         // Right: form chi tiết
         var fl = new FlowLayoutPanel
@@ -397,12 +426,27 @@ public class DPVForm : Form
             Padding = new Padding(12, 8, 12, 8),
             BackColor = UiTheme.Surface
         };
-        var btnReload = Btn("Tải lại danh sách", UiTheme.HealthCyan, width: 160);
+        var btnReload = Btn("Tải lại danh sách", UiTheme.HealthCyan, width: 220);
         btnReload.Click += (_, _) => LoadHSBA();
         btnReload.Dock = DockStyle.Left;
         topBar.Controls.Add(btnReload);
-        split.Panel1.Controls.Add(_dgvHSBA);
-        split.Panel1.Controls.Add(topBar);
+        var hsbaTopLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        hsbaTopLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+        hsbaTopLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        hsbaTopLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        topBar.Dock = DockStyle.Fill;
+        topBar.Margin = Padding.Empty;
+        _dgvHSBA.Margin = Padding.Empty;
+        hsbaTopLayout.Controls.Add(topBar, 0, 0);
+        hsbaTopLayout.Controls.Add(_dgvHSBA, 0, 1);
+        split.Panel1.Controls.Add(hsbaTopLayout);
 
         // ── Bottom: 2 cột — tạo/điều phối (trái) + dịch vụ (phải) ────────────
         var bot = new TableLayoutPanel
@@ -423,17 +467,31 @@ public class DPVForm : Form
         var coordTitle = new Label
         {
             Text = "Tạo HSBA mới / Điều phối",
-            Dock = DockStyle.Top, Height = 28,
+            Dock = DockStyle.Fill, Height = 32,
             Font = UiTheme.LabelBold(11f),
-            ForeColor = UiTheme.TextDark
+            ForeColor = UiTheme.TextDark,
+            TextAlign = ContentAlignment.MiddleLeft
         };
-        coordCard.Controls.Add(coordTitle);
+        var coordLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty,
+            BackColor = UiTheme.Surface
+        };
+        coordLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+        coordLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        coordLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        coordLayout.Controls.Add(coordTitle, 0, 0);
 
         var grid = new TableLayoutPanel
         {
             Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4,
             BackColor = UiTheme.Surface,
-            Padding = new Padding(0, 12, 0, 0)
+            Padding = new Padding(0, 4, 0, 0),
+            Margin = Padding.Empty
         };
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -442,24 +500,40 @@ public class DPVForm : Form
 
         _cmbBNForHSBA = new ComboBox
         {
-            Dock = DockStyle.Fill, Margin = new Padding(0, 4, 0, 4),
-            DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Body(10f)
+            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
+            Margin = new Padding(0, 10, 0, 4),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Font = UiTheme.Body(10f),
+            Height = 28
         };
-        _txtMakhoa = new TextBox
+        _cmbKhoa = new ComboBox
         {
-            Dock = DockStyle.Fill, Margin = new Padding(0, 4, 0, 4),
-            Font = UiTheme.Body(10f)
+            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
+            Margin = new Padding(0, 10, 0, 4),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Font = UiTheme.Body(10f),
+            Height = 28
         };
+        _cmbKhoa.Items.AddRange(new object[]
+        {
+            "Tim mạch", "Thần kinh", "Tiêu hóa", "Hô hấp",
+            "Nội tiết", "Cơ xương khớp", "Sản phụ khoa", "Nhi khoa",
+            "Da liễu", "Tai mũi họng", "Mắt", "Răng hàm mặt",
+            "Truyền nhiễm", "Cấp cứu", "Hồi sức tích cực"
+        });
         _cmbBS = new ComboBox
         {
-            Dock = DockStyle.Fill, Margin = new Padding(0, 4, 0, 4),
-            DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Body(10f)
+            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
+            Margin = new Padding(0, 10, 0, 4),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Font = UiTheme.Body(10f),
+            Height = 28
         };
 
         grid.Controls.Add(GridLabel("Bệnh nhân"), 0, 0);
         grid.Controls.Add(_cmbBNForHSBA,          1, 0);
         grid.Controls.Add(GridLabel("Khoa"),      0, 1);
-        grid.Controls.Add(_txtMakhoa,             1, 1);
+        grid.Controls.Add(_cmbKhoa,               1, 1);
         grid.Controls.Add(GridLabel("Bác sĩ"),    0, 2);
         grid.Controls.Add(_cmbBS,                 1, 2);
 
@@ -469,14 +543,19 @@ public class DPVForm : Form
             BackColor = UiTheme.Surface, Padding = new Padding(0, 6, 0, 0)
         };
         _btnAssignBS = Btn("Giao cho bác sĩ", UiTheme.RoleDPV, width: 150);
+        _btnAssignBS.Width = 190;
+        _btnAssignBS.MinimumSize = new Size(190, _btnAssignBS.Height);
         _btnAssignBS.Click += BtnAssignBS_Click;
         _btnCreateHSBA = Btn("Tạo HSBA mới", UiTheme.HealthGreen, width: 140);
+        _btnCreateHSBA.Width = 160;
+        _btnCreateHSBA.MinimumSize = new Size(160, _btnCreateHSBA.Height);
         _btnCreateHSBA.Click += BtnCreateHSBA_Click;
         btnRow.Controls.Add(_btnAssignBS);
         btnRow.Controls.Add(_btnCreateHSBA);
         grid.Controls.Add(btnRow, 1, 3);
 
-        coordCard.Controls.Add(grid);
+        coordLayout.Controls.Add(grid, 0, 1);
+        coordCard.Controls.Add(coordLayout);
         bot.Controls.Add(coordCard, 0, 0);
 
         // ── Card phải: Dịch vụ chẩn đoán ─────────────────────────────────────
@@ -500,11 +579,26 @@ public class DPVForm : Form
         _btnAssignKTV.Dock = DockStyle.Right;
         _btnAssignKTV.Click += BtnAssignKTV_Click;
         dvBottom.Controls.Add(_btnAssignKTV);
-        dvCard.Controls.Add(dvBottom);
-
         _dgvDV = MakeGrid();
         _dgvDV.Dock = DockStyle.Fill;
-        dvCard.Controls.Add(_dgvDV);
+        _dgvDV.Margin = Padding.Empty;
+
+        var dvLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        dvLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        dvLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        dvLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        dvBottom.Dock = DockStyle.Fill;
+        dvBottom.Margin = Padding.Empty;
+        dvLayout.Controls.Add(_dgvDV, 0, 0);
+        dvLayout.Controls.Add(dvBottom, 0, 1);
+        dvCard.Controls.Add(dvLayout);
 
         bot.Controls.Add(dvCard, 1, 0);
 
@@ -550,22 +644,38 @@ public class DPVForm : Form
 
     private void LoadBSList()
     {
-        TryCatch(() =>
+        try
         {
             _cmbBS.Items.Clear();
             var dt = _db.Query("SELECT MANV||' - '||HOTEN AS BS FROM BVADMIN.NV_LOOKUP_View WHERE VAITRO='BS' ORDER BY HOTEN");
             foreach (DataRow r in dt.Rows) _cmbBS.Items.Add(r[0].ToString()!);
-        });
+            if (_cmbBS.Items.Count == 0)
+                _cmbBS.Items.Add("(không có bác sĩ — chạy 11_NV_Lookup_Grants.sql)");
+        }
+        catch (Exception ex)
+        {
+            AppAuditLogger.Error(_db.Username, "DPV.LoadBSList", ex.Message);
+            _cmbBS.Items.Clear();
+            _cmbBS.Items.Add($"(lỗi: {OracleErrorMapper.Short(ex)})");
+        }
     }
 
     private void LoadBNList()
     {
-        TryCatch(() =>
+        try
         {
             _cmbBNForHSBA.Items.Clear();
             var dt = _db.Query("SELECT MABN||' - '||TENBN FROM BVADMIN.BENHNHAN ORDER BY TENBN");
             foreach (DataRow r in dt.Rows) _cmbBNForHSBA.Items.Add(r[0].ToString()!);
-        });
+            if (_cmbBNForHSBA.Items.Count == 0)
+                _cmbBNForHSBA.Items.Add("(chưa có bệnh nhân nào)");
+        }
+        catch (Exception ex)
+        {
+            AppAuditLogger.Error(_db.Username, "DPV.LoadBNList", ex.Message);
+            _cmbBNForHSBA.Items.Clear();
+            _cmbBNForHSBA.Items.Add($"(lỗi tải BN: {OracleErrorMapper.Short(ex)})");
+        }
     }
 
     private void BtnCreateHSBA_Click(object? s, EventArgs e)
@@ -574,7 +684,7 @@ public class DPVForm : Form
         {
             if (_cmbBNForHSBA.SelectedIndex < 0) { ShowError("Chọn bệnh nhân."); return; }
             var mabn = _cmbBNForHSBA.Text.Split('-')[0].Trim();
-            var khoa = _txtMakhoa.Text.Trim();
+            var khoa = _cmbKhoa.SelectedItem?.ToString() ?? "";
 
             // Lấy MAHSBA từ SEQUENCE (không collision dù tạo nhanh)
             var mahsba = _db.Scalar(
@@ -637,38 +747,84 @@ public class DPVForm : Form
     private TabPage BuildThongBaoTab()
     {
         var page = new TabPage("Thông báo");
+        page.BackColor = UiTheme.BgLight;
+
         var lblLabel = new Label
         {
-            Dock = DockStyle.Top,
-            Height = 28,
-            Padding = new Padding(8, 6, 0, 0),
-            Font = UiTheme.LabelBold(),
-            ForeColor = Color.FromArgb(80, 60, 30),
-            Text = "Nhãn OLS: (chưa tải)"
+            Dock = DockStyle.Top, Height = 36,
+            Padding = new Padding(12, 8, 0, 0),
+            Font = UiTheme.LabelBold(10f),
+            ForeColor = UiTheme.HealthCyan,
+            Text = "Nhãn OLS của bạn: (bấm Tải để xem)",
+            BackColor = UiTheme.Surface
         };
-        var dgv  = MakeGrid(); dgv.Dock = DockStyle.Fill;
-        var btn  = Btn("Tải lại", UiTheme.HealthCyan);
-        btn.Dock = DockStyle.Top;
-        btn.Click += (_, _) => TryCatch(() =>
+
+        var lblHint = new Label
         {
-            lblLabel.Text = "Nhãn OLS: " + CurrentOlsLabel();
-            dgv.DataSource = _db.Query(
-                "SELECT MATB, SUBSTR(TO_CHAR(NOIDUNG),1,100) AS NOIDUNG, " +
-                "TO_CHAR(NGAYGIO,'DD/MM/YYYY HH24:MI') AS NGAYGIO, DIADIEM " +
-                "FROM BVADMIN.THONGBAO ORDER BY NGAYGIO DESC");
-        });
-        page.Controls.Add(dgv); page.Controls.Add(lblLabel); page.Controls.Add(btn);
+            Dock = DockStyle.Top, Height = 28,
+            Padding = new Padding(12, 4, 12, 4),
+            Font = UiTheme.Italic(9f),
+            ForeColor = UiTheme.TextMuted,
+            BackColor = UiTheme.Surface,
+            Text = "Hệ thống tự lọc thông báo theo nhãn OLS. Nếu trống, cần chạy migration OLS labels."
+        };
+
+        var dgv = MakeGrid(); dgv.Dock = DockStyle.Fill;
+        var btn = Btn("Tải thông báo", UiTheme.HealthCyan, width: 150);
+        btn.Dock = DockStyle.Top;
+        btn.Click += (_, _) =>
+        {
+            try
+            {
+                try { lblLabel.Text = "Nhãn OLS của bạn: " + CurrentOlsLabel(); }
+                catch { lblLabel.Text = "Nhãn OLS của bạn: (chưa có — chạy migration 09 hoặc setup_all.sql)"; }
+
+                dgv.DataSource = _db.Query(
+                    "SELECT MATB, SUBSTR(TO_CHAR(NOIDUNG),1,100) AS NOIDUNG, " +
+                    "TO_CHAR(NGAYGIO,'DD/MM/YYYY HH24:MI') AS NGAYGIO, DIADIEM " +
+                    "FROM BVADMIN.THONGBAO ORDER BY NGAYGIO DESC");
+            }
+            catch (Exception ex)
+            {
+                AppAuditLogger.Error(_db.Username, "DPV.LoadTB", ex.Message);
+                MessageBox.Show(this,
+                    $"{OracleErrorMapper.Friendly(ex)}\n\n" +
+                    "Để xem thông báo, cần chạy migration:\n" +
+                    "  @PhanHe2/setup_all.sql\n\n" +
+                    "Migration sẽ:\n" +
+                    "  • Grant SELECT trên THONGBAO cho DPV/BS/KTV role\n" +
+                    "  • Gán nhãn OLS cho nhân viên (CAPBAC, COSO, KHOA)",
+                    "Cần cấp quyền OLS", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 4,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        lblLabel.Dock = DockStyle.Fill;
+        lblHint.Dock = DockStyle.Fill;
+        btn.Dock = DockStyle.Fill;
+        dgv.Margin = Padding.Empty;
+        layout.Controls.Add(lblLabel, 0, 0);
+        layout.Controls.Add(lblHint, 0, 1);
+        layout.Controls.Add(btn, 0, 2);
+        layout.Controls.Add(dgv, 0, 3);
+        page.Controls.Add(layout);
         return page;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-    private static DataGridView MakeGrid() => new()
-    {
-        ReadOnly = true, AllowUserToAddRows = false,
-        AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells,
-        SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-        BackgroundColor = Color.White, RowHeadersVisible = false
-    };
+    private static DataGridView MakeGrid() => UiTheme.Grid();
 
     private static Label Lbl(string text) =>
         new() { Text = text, AutoSize = true, Font = UiTheme.Body(),
@@ -679,17 +835,21 @@ public class DPVForm : Form
                 ForeColor = Color.FromArgb(180, 100, 0), Padding = new Padding(0, 4, 0, 4) };
 
     private static TextBox TB(int width) =>
-        new() { Width = width, Height = 24, Font = UiTheme.Body() };
+        new() { Width = width, Height = 30, Font = UiTheme.Body() };
 
     private static Button Btn(string text, Color color, int width = 130,
                               EventHandler? onClick = null)
     {
         var btn = new Button
         {
-            Text = text, Width = width, Height = 32, BackColor = color,
+            Text = text, Width = width, Height = 38, MinimumSize = new Size(width, 38), BackColor = color,
             ForeColor = Color.White, FlatStyle = FlatStyle.Flat,
-            Font = UiTheme.Body(), Cursor = Cursors.Hand
+            Font = UiTheme.Body(), Cursor = Cursors.Hand,
+            Padding = new Padding(8, 0, 8, 0),
+            TextAlign = ContentAlignment.MiddleCenter,
+            UseCompatibleTextRendering = false
         };
+        btn.FlatAppearance.BorderSize = 0;
         if (onClick is not null) btn.Click += onClick;
         return btn;
     }
@@ -716,7 +876,7 @@ public class DPVForm : Form
         try
         {
             return _db.Scalar(
-                "SELECT NVL(MAX(LABEL), '(chưa gán)') " +
+                "SELECT NVL(MAX(MAX_READ_LABEL), '(chưa gán)') " +
                 "FROM DBA_SA_USER_LABELS " +
                 "WHERE POLICY_NAME='BV_LABEL_POLICY' AND USER_NAME=USER")?.ToString() ?? "(chưa gán)";
         }

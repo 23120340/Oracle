@@ -98,7 +98,7 @@ public class BSForm : Form
 
     private TabPage BuildMyProfileTab()
     {
-        var p = new TabPage("👤 Thông tin của tôi");
+        var p = new TabPage("Thông tin của tôi");
         p.Controls.Add(new MyProfilePanel(_db));
         return p;
     }
@@ -115,7 +115,8 @@ public class BSForm : Form
         {
             Text = title, Dock = DockStyle.Left, Width = 300,
             Font = UiTheme.Heading2(), ForeColor = UiTheme.TextDark,
-            TextAlign = ContentAlignment.MiddleLeft
+            TextAlign = ContentAlignment.MiddleLeft,
+            AutoEllipsis = true
         };
         var roleChip = new RoleChip
         {
@@ -140,6 +141,7 @@ public class BSForm : Form
         {
             btnLogout.Location = new Point(header.Width - btnLogout.Width - 16, 12);
             roleChip.Location  = new Point(btnLogout.Left - roleChip.Width - 12, 17);
+            lblTitle.Width = Math.Max(140, roleChip.Left - lblTitle.Left - 16);
         }
         header.Resize += (_, _) => layout();
         roleChip.HandleCreated += (_, _) => layout();
@@ -155,7 +157,7 @@ public class BSForm : Form
     // ═══════════════════════════════════════════════════════════════════════════
     private TabPage BuildHSBATab()
     {
-        var page = new TabPage("📋 Hồ sơ Bệnh án");
+        var page = new TabPage("Hồ sơ bệnh án");
         var split = new SplitContainer
         {
             Dock = DockStyle.Fill,
@@ -173,9 +175,10 @@ public class BSForm : Form
         var detail = new TabControl { Dock = DockStyle.Fill };
 
         // Sub-tab 1: Chỉnh sửa chẩn đoán
-        var tDetail = new TabPage("📝 Cập nhật HSBA");
+        var tDetail = new TabPage("Cập nhật HSBA");
         var fl = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
-                                       Padding = new Padding(10), AutoScroll = true };
+                                       Padding = new Padding(10), AutoScroll = true,
+                                       WrapContents = false };
         _lblHSBAId = new Label { AutoSize = true, Font = UiTheme.LabelBold(),
                                  ForeColor = Color.Navy };
         fl.Controls.Add(_lblHSBAId);
@@ -185,54 +188,103 @@ public class BSForm : Form
         _txtDieutri = TB(600, 60); fl.Controls.Add(_txtDieutri);
         fl.Controls.Add(new Label { Text = "Kết luận:", AutoSize = true });
         _txtKetluan = TB(600, 60); fl.Controls.Add(_txtKetluan);
-        _btnSaveHSBA = Btn("💾 Lưu HSBA", Color.FromArgb(0, 120, 80));
+        _btnSaveHSBA = Btn("Lưu HSBA", UiTheme.HealthGreen);
         _btnSaveHSBA.Click += BtnSaveHSBA_Click;
         fl.Controls.Add(_btnSaveHSBA);
         tDetail.Controls.Add(fl);
 
         // Sub-tab 2: Dịch vụ (HSBA_DV)
-        var tDV = new TabPage("🔬 Dịch vụ chuẩn đoán");
+        var tDV = new TabPage("Dịch vụ chẩn đoán");
         var dvPanel = new Panel { Dock = DockStyle.Fill };
         _dgvDV = MakeGrid(); _dgvDV.Dock = DockStyle.Fill;
         var dvBot = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 44, Padding = new Padding(4),
-                                          FlowDirection = FlowDirection.LeftToRight };
-        var btnAddDV   = Btn("➕ Thêm DV",  Color.SteelBlue);
-        var btnDelDV   = Btn("🗑 Xóa DV",   Color.Crimson);
+                                          FlowDirection = FlowDirection.LeftToRight,
+                                          WrapContents = false, AutoScroll = true };
+        var btnAddDV   = Btn("Thêm DV", UiTheme.HealthCyan);
+        var btnDelDV   = Btn("Xóa DV", UiTheme.Danger);
         btnAddDV.Click += BtnAddDV_Click;
         btnDelDV.Click += BtnDelDV_Click;
         dvBot.Controls.AddRange(new Control[] { btnAddDV, btnDelDV });
-        dvPanel.Controls.Add(_dgvDV);
-        dvPanel.Controls.Add(dvBot);
+        var dvLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        dvLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        dvLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
+        dvLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        _dgvDV.Margin = Padding.Empty;
+        dvBot.Dock = DockStyle.Fill;
+        dvBot.Margin = Padding.Empty;
+        dvLayout.Controls.Add(_dgvDV, 0, 0);
+        dvLayout.Controls.Add(dvBot, 0, 1);
+        dvPanel.Controls.Add(dvLayout);
         tDV.Controls.Add(dvPanel);
 
         // Sub-tab 3: Đơn thuốc
-        var tDT = new TabPage("💊 Đơn thuốc");
+        var tDT = new TabPage("Đơn thuốc");
         var dtPanel = new Panel { Dock = DockStyle.Fill };
         _dgvDT = MakeGrid(); _dgvDT.Dock = DockStyle.Fill;
         var dtBot = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 80, Padding = new Padding(4),
-                                          FlowDirection = FlowDirection.LeftToRight };
+                                          FlowDirection = FlowDirection.LeftToRight,
+                                          WrapContents = false, AutoScroll = true };
         dtBot.Controls.Add(new Label { Text = "Thuốc:", AutoSize = true, Padding = new Padding(0, 8, 0, 0) });
         _txtTenthuoc = new TextBox { Width = 160, Font = UiTheme.Body() };
         dtBot.Controls.Add(_txtTenthuoc);
         dtBot.Controls.Add(new Label { Text = "Liều:", AutoSize = true, Padding = new Padding(0, 8, 0, 0) });
         _txtLieudung = new TextBox { Width = 160, Font = UiTheme.Body() };
         dtBot.Controls.Add(_txtLieudung);
-        var btnAddDT = Btn("➕ Thêm",  Color.SteelBlue);
-        var btnDelDT = Btn("🗑 Xóa",   Color.Crimson);
+        var btnAddDT = Btn("Thêm", UiTheme.HealthCyan);
+        var btnDelDT = Btn("Xóa", UiTheme.Danger);
         btnAddDT.Click += BtnAddDT_Click;
         btnDelDT.Click += BtnDelDT_Click;
         dtBot.Controls.AddRange(new Control[] { btnAddDT, btnDelDT });
-        dtPanel.Controls.Add(_dgvDT);
-        dtPanel.Controls.Add(dtBot);
+        var dtLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        dtLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        dtLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 92));
+        dtLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        _dgvDT.Margin = Padding.Empty;
+        dtBot.Dock = DockStyle.Fill;
+        dtBot.Margin = Padding.Empty;
+        dtLayout.Controls.Add(_dgvDT, 0, 0);
+        dtLayout.Controls.Add(dtBot, 0, 1);
+        dtPanel.Controls.Add(dtLayout);
         tDT.Controls.Add(dtPanel);
 
         detail.TabPages.AddRange(new[] { tDetail, tDV, tDT });
         split.Panel2.Controls.Add(detail);
 
-        var btnRefresh = Btn("🔄 Tải HSBA", Color.SteelBlue);
+        var btnRefresh = Btn("Tải HSBA", UiTheme.HealthCyan);
         btnRefresh.Dock = DockStyle.Top;
         btnRefresh.Click += (_, _) => LoadHSBA();
-        split.Panel1.Controls.Add(btnRefresh);
+        var topLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        topLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        topLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        btnRefresh.Dock = DockStyle.Fill;
+        btnRefresh.Margin = Padding.Empty;
+        _dgvHSBA.Margin = Padding.Empty;
+        split.Panel1.Controls.Clear();
+        topLayout.Controls.Add(btnRefresh, 0, 0);
+        topLayout.Controls.Add(_dgvHSBA, 0, 1);
+        split.Panel1.Controls.Add(topLayout);
 
         page.Controls.Add(split);
         page.Enter += (_, _) => LoadHSBA();
@@ -437,17 +489,32 @@ public class BSForm : Form
     // ═══════════════════════════════════════════════════════════════════════════
     private TabPage BuildBNTab()
     {
-        var page = new TabPage("🧑‍⚕ Bệnh nhân");
+        var page = new TabPage("Bệnh nhân");
         var split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 200 };
 
         _dgvBN = MakeGrid(); _dgvBN.Dock = DockStyle.Fill;
         _dgvBN.SelectionChanged += (_, _) => LoadBNDetail();
 
-        var btnRefBN = Btn("🔄 Tải DS bệnh nhân", Color.SteelBlue);
+        var btnRefBN = Btn("Tải DS bệnh nhân", UiTheme.HealthCyan);
         btnRefBN.Dock = DockStyle.Top;
         btnRefBN.Click += (_, _) => LoadBN();
-        split.Panel1.Controls.Add(_dgvBN);
-        split.Panel1.Controls.Add(btnRefBN);
+        var bnLeftLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        bnLeftLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        bnLeftLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        bnLeftLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        btnRefBN.Dock = DockStyle.Fill;
+        btnRefBN.Margin = Padding.Empty;
+        _dgvBN.Margin = Padding.Empty;
+        bnLeftLayout.Controls.Add(btnRefBN, 0, 0);
+        bnLeftLayout.Controls.Add(_dgvBN, 0, 1);
+        split.Panel1.Controls.Add(bnLeftLayout);
 
         var fl = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
                                        Padding = new Padding(10), AutoScroll = true };
@@ -459,7 +526,7 @@ public class BSForm : Form
         _txtTSBGD = TB(600, 60); fl.Controls.Add(_txtTSBGD);
         fl.Controls.Add(new Label { Text = "Dị ứng thuốc:", AutoSize = true });
         _txtDiung = TB(600, 30); fl.Controls.Add(_txtDiung);
-        _btnSaveBN = Btn("💾 Cập nhật tiền sử", Color.FromArgb(0, 120, 80));
+        _btnSaveBN = Btn("Cập nhật tiền sử", UiTheme.HealthGreen, 170);
         _btnSaveBN.Click += BtnSaveBN_Click;
         fl.Controls.Add(_btnSaveBN);
         split.Panel2.Controls.Add(fl);
@@ -522,7 +589,7 @@ public class BSForm : Form
     // ═══════════════════════════════════════════════════════════════════════════
     private TabPage BuildThongBaoTab()
     {
-        var page = new TabPage("📢 Thông báo");
+        var page = new TabPage("Thông báo");
         var lblLabel = new Label
         {
             Dock = DockStyle.Top,
@@ -533,7 +600,7 @@ public class BSForm : Form
             Text = "Nhãn OLS: (chưa tải)"
         };
         var dgv  = MakeGrid(); dgv.Dock = DockStyle.Fill;
-        var btn  = Btn("🔄 Tải thông báo", Color.SteelBlue); btn.Dock = DockStyle.Top;
+        var btn  = Btn("Tải thông báo", UiTheme.HealthCyan); btn.Dock = DockStyle.Top;
         btn.Click += (_, _) =>
         {
             TryCatch(() =>
@@ -546,29 +613,55 @@ public class BSForm : Form
                     "FROM BVADMIN.THONGBAO ORDER BY NGAYGIO DESC");
             });
         };
-        page.Controls.Add(dgv);
-        page.Controls.Add(lblLabel);
-        page.Controls.Add(btn);
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        lblLabel.Dock = DockStyle.Fill;
+        btn.Dock = DockStyle.Fill;
+        dgv.Margin = Padding.Empty;
+        layout.Controls.Add(lblLabel, 0, 0);
+        layout.Controls.Add(btn, 0, 1);
+        layout.Controls.Add(dgv, 0, 2);
+        page.Controls.Add(layout);
         return page;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-    private static DataGridView MakeGrid() => new()
+    private static DataGridView MakeGrid() => UiTheme.Grid();
+
+    private static TextBox TB(int width, int height = 30) =>
+        new() { Multiline = height > 30, Width = width, Height = Math.Max(height, 30),
+                Font = UiTheme.Body(), ScrollBars = height > 30 ? ScrollBars.Vertical : ScrollBars.None };
+
+    private static Button Btn(string text, Color color, int width = 140)
     {
-        ReadOnly = true, AllowUserToAddRows = false,
-        AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells,
-        SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-        BackgroundColor = Color.White, RowHeadersVisible = false
-    };
-
-    private static TextBox TB(int width, int height = 24) =>
-        new() { Multiline = height > 24, Width = width, Height = height,
-                Font = UiTheme.Body(), ScrollBars = height > 24 ? ScrollBars.Vertical : ScrollBars.None };
-
-    private static Button Btn(string text, Color color, int width = 140) =>
-        new() { Text = text, Width = width, Height = 32, BackColor = color,
-                ForeColor = Color.White, FlatStyle = FlatStyle.Flat,
-                Font = UiTheme.Body(), Cursor = Cursors.Hand };
+        var btn = new Button
+        {
+            Text = text,
+            Width = width,
+            Height = 38,
+            MinimumSize = new Size(width, 38),
+            BackColor = color,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Font = UiTheme.Body(),
+            Cursor = Cursors.Hand,
+            Padding = new Padding(8, 0, 8, 0),
+            TextAlign = ContentAlignment.MiddleCenter,
+            UseCompatibleTextRendering = false
+        };
+        btn.FlatAppearance.BorderSize = 0;
+        return btn;
+    }
 
     private static string ExtractLabel(Label lbl)
     {
@@ -598,7 +691,7 @@ public class BSForm : Form
         try
         {
             return _db.Scalar(
-                "SELECT NVL(MAX(LABEL), '(chưa gán)') " +
+                "SELECT NVL(MAX(MAX_READ_LABEL), '(chưa gán)') " +
                 "FROM DBA_SA_USER_LABELS " +
                 "WHERE POLICY_NAME='BV_LABEL_POLICY' AND USER_NAME=USER")?.ToString() ?? "(chưa gán)";
         }

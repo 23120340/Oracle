@@ -108,7 +108,8 @@ public class AdminDashboard : Form
             Dock = DockStyle.Left, Width = 400,
             Font = UiTheme.Heading2(),
             ForeColor = UiTheme.TextDark,
-            TextAlign = ContentAlignment.MiddleLeft
+            TextAlign = ContentAlignment.MiddleLeft,
+            AutoEllipsis = true
         };
         var roleChip = new RoleChip
         {
@@ -136,6 +137,7 @@ public class AdminDashboard : Form
         {
             btnLogout.Location = new Point(header.Width - btnLogout.Width - 16, 12);
             roleChip.Location  = new Point(btnLogout.Left - roleChip.Width - 12, 17);
+            title.Width = Math.Max(160, roleChip.Left - title.Left - 16);
         }
         header.Resize += (_, _) => layoutHeader();
         roleChip.HandleCreated += (_, _) => layoutHeader();
@@ -192,7 +194,7 @@ public class AdminDashboard : Form
     {
         var panel = new Panel
         {
-            Dock = DockStyle.Top, Height = 130,
+            Dock = DockStyle.Top, Height = 148,           // tăng để chứa card 118 + padding
             BackColor = UiTheme.BgLight,
             Padding = new Padding(24, 12, 24, 12)
         };
@@ -200,6 +202,7 @@ public class AdminDashboard : Form
         {
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
             AutoScroll = false,
             BackColor = UiTheme.BgLight
         };
@@ -208,33 +211,44 @@ public class AdminDashboard : Form
         {
             Glyph = IconRegistry.People, GlyphColor = UiTheme.HealthCyan,
             Label = "Người dùng", Value = "—", Subtext = "tổng số tài khoản",
-            Width = 240, Height = 100,
-            Margin = new Padding(0, 0, 12, 0)
+            Width = 248, Height = 118,
+            Margin = new Padding(0, 0, 14, 0)
         };
         var kpiRoles = new KpiCard
         {
             Glyph = IconRegistry.Tag, GlyphColor = UiTheme.HealthEmerald,
             Label = "Vai trò", Value = "—", Subtext = "roles đã định nghĩa",
-            Width = 240, Height = 100,
-            Margin = new Padding(0, 0, 12, 0)
+            Width = 248, Height = 118,
+            Margin = new Padding(0, 0, 14, 0)
         };
         var kpiGrants = new KpiCard
         {
             Glyph = IconRegistry.Key, GlyphColor = UiTheme.StatusWarning,
             Label = "Cấp quyền", Value = "—", Subtext = "object/role privileges",
-            Width = 240, Height = 100,
-            Margin = new Padding(0, 0, 12, 0)
+            Width = 248, Height = 118,
+            Margin = new Padding(0, 0, 14, 0)
         };
         var kpiAudit = new KpiCard
         {
             Glyph = IconRegistry.Shield, GlyphColor = UiTheme.StatusDanger,
             Label = "Audit hôm nay", Value = "—", Subtext = "lượt thao tác đã ghi",
-            Width = 240, Height = 100,
-            Margin = new Padding(0, 0, 12, 0)
+            Width = 248, Height = 118,
+            Margin = new Padding(0, 0, 14, 0)
         };
 
         flow.Controls.AddRange(new Control[] { kpiUsers, kpiRoles, kpiGrants, kpiAudit });
         panel.Controls.Add(flow);
+
+        void resizeCards()
+        {
+            var cards = new[] { kpiUsers, kpiRoles, kpiGrants, kpiAudit };
+            var totalMargins = cards.Sum(c => c.Margin.Left + c.Margin.Right);
+            var w = Math.Max(168, (flow.ClientSize.Width - totalMargins - 6) / cards.Length);
+            foreach (var card in cards) card.Width = w;
+        }
+        flow.Resize += (_, _) => resizeCards();
+        panel.Resize += (_, _) => resizeCards();
+        resizeCards();
 
         // Refresh KPI numbers khi form shown
         Shown += (_, _) => RefreshKpis(kpiUsers, kpiRoles, kpiGrants, kpiAudit);
@@ -272,11 +286,17 @@ public class AdminDashboard : Form
             Padding = new Padding(16)
         };
 
-        var titleRow = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = UiTheme.Surface };
+        var titleRow = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 64,
+            BackColor = UiTheme.Surface,
+            Padding = new Padding(0, 0, 0, 12)
+        };
         var lblTitle = new Label
         {
             Text = "Nhật ký kiểm toán hệ thống",
-            Dock = DockStyle.Left, Width = 350,
+            Dock = DockStyle.Left, Width = 520,
             Font = UiTheme.Heading3(),
             TextAlign = ContentAlignment.MiddleLeft
         };
@@ -284,27 +304,12 @@ public class AdminDashboard : Form
         {
             Text = "Làm mới", Glyph = IconRegistry.Refresh,
             BackColor = UiTheme.HealthCyan,
-            Width = 130, Height = 36,
-            Dock = DockStyle.Right
+            Width = 130, Height = 40,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right
         };
 
-        var grid = new DataGridView
-        {
-            Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-            BackgroundColor = Color.White, RowHeadersVisible = false,
-            Font = UiTheme.Body(),
-            EnableHeadersVisualStyles = false,
-            BorderStyle = BorderStyle.None,
-            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
-            {
-                BackColor = UiTheme.BgLight,
-                ForeColor = UiTheme.TextDark,
-                Font = UiTheme.LabelBold(),
-                Padding = new Padding(8, 4, 8, 4)
-            }
-        };
+        var grid = UiTheme.Grid();
+        grid.Dock = DockStyle.Fill;
 
         btnRefresh.Click += (_, _) => TryCatch(() =>
         {
@@ -318,8 +323,17 @@ public class AdminDashboard : Form
                 "FETCH FIRST 200 ROWS ONLY");
         });
 
-        titleRow.Controls.Add(btnRefresh);
         titleRow.Controls.Add(lblTitle);
+        titleRow.Controls.Add(btnRefresh);
+        void layoutAuditHeader()
+        {
+            btnRefresh.Location = new Point(
+                Math.Max(0, titleRow.ClientSize.Width - btnRefresh.Width - 8),
+                8);
+            lblTitle.Width = Math.Max(180, titleRow.ClientSize.Width - btnRefresh.Width - 24);
+        }
+        titleRow.Resize += (_, _) => layoutAuditHeader();
+        layoutAuditHeader();
         card.Controls.Add(grid);
         card.Controls.Add(titleRow);
         container.Controls.Add(card);
@@ -333,7 +347,7 @@ public class AdminDashboard : Form
     // ═══════════════════════════════════════════════════════════════════════════
     private TabPage BuildUserTab()
     {
-        var page = new TabPage("👤 Users");
+        var page = new TabPage("Users");
 
         _dgvUsers = MakeGrid(new[]
         {
@@ -341,21 +355,25 @@ public class AdminDashboard : Form
             "CREATED", "EXPIRY_DATE"
         });
         _dgvUsers.Dock = DockStyle.Fill;
+        _dgvUsers.Margin = Padding.Empty;
 
-        var panel = new Panel { Dock = DockStyle.Bottom, Height = 110, Padding = new Padding(8) };
+        var panel = new Panel { Dock = DockStyle.Fill, Height = 132, Padding = new Padding(14, 12, 14, 12), BackColor = UiTheme.BgLight };
+        panel.Margin = Padding.Empty;
 
         var row1 = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.LeftToRight,
             Dock          = DockStyle.Top,
-            Height        = 40,
-            Padding       = new Padding(0, 4, 0, 0)
+            Height        = 50,
+            Padding       = new Padding(0, 2, 0, 4),
+            WrapContents  = false,
+            AutoScroll    = true
         };
         row1.Controls.Add(Label("Username mới:"));
         _txtNewUser = TB(150); row1.Controls.Add(_txtNewUser);
         row1.Controls.Add(Label("Password:"));
         _txtNewPass = TB(120, isPass: true); row1.Controls.Add(_txtNewPass);
-        _btnCreateUser = Btn("➕ Tạo User", Color.Green);
+        _btnCreateUser = Btn("+ Tạo User", UiTheme.HealthGreen, 140);
         _btnCreateUser.Click += BtnCreateUser_Click;
         row1.Controls.Add(_btnCreateUser);
 
@@ -363,17 +381,32 @@ public class AdminDashboard : Form
         {
             FlowDirection = FlowDirection.LeftToRight,
             Dock          = DockStyle.Fill,
-            Padding       = new Padding(0, 4, 0, 0)
+            Padding       = new Padding(0, 4, 0, 0),
+            WrapContents  = false,
+            AutoScroll    = true
         };
-        _btnDropUser    = Btn("🗑 Drop User",  Color.Crimson);   _btnDropUser.Click    += BtnDropUser_Click;
-        _btnLockUser    = Btn("🔒 Lock",       Color.DarkOrange); _btnLockUser.Click    += (_, _) => LockUser(true);
-        _btnUnlockUser  = Btn("🔓 Unlock",     Color.Teal);       _btnUnlockUser.Click  += (_, _) => LockUser(false);
-        _btnRefreshUsers= Btn("🔄 Refresh",    Color.SteelBlue);  _btnRefreshUsers.Click+= (_, _) => LoadUsers();
+        _btnDropUser    = Btn("Drop User", UiTheme.Danger, 130);       _btnDropUser.Click    += BtnDropUser_Click;
+        _btnLockUser    = Btn("Lock", UiTheme.StatusWarning, 105);     _btnLockUser.Click    += (_, _) => LockUser(true);
+        _btnUnlockUser  = Btn("Unlock", UiTheme.HealthCyan, 115);      _btnUnlockUser.Click  += (_, _) => LockUser(false);
+        _btnRefreshUsers= Btn("Refresh", UiTheme.Primary, 120);        _btnRefreshUsers.Click+= (_, _) => LoadUsers();
         row2.Controls.AddRange(new Control[] { _btnDropUser, _btnLockUser, _btnUnlockUser, _btnRefreshUsers });
 
         panel.Controls.AddRange(new Control[] { row2, row1 });
-        page.Controls.Add(_dgvUsers);
-        page.Controls.Add(panel);
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 132));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.Controls.Add(panel, 0, 0);
+        layout.Controls.Add(_dgvUsers, 0, 1);
+        page.Controls.Add(layout);
 
         page.Enter += (_, _) => LoadUsers();
         return page;
@@ -440,30 +473,46 @@ public class AdminDashboard : Form
     // ═══════════════════════════════════════════════════════════════════════════
     private TabPage BuildRoleTab()
     {
-        var page = new TabPage("🎭 Roles");
+        var page = new TabPage("Roles");
 
         _dgvRoles = MakeGrid(new[] { "ROLE", "AUTHENTICATION_TYPE", "COMMON" });
         _dgvRoles.Dock = DockStyle.Fill;
+        _dgvRoles.Margin = Padding.Empty;
 
-        var panel = new Panel { Dock = DockStyle.Bottom, Height = 60, Padding = new Padding(8) };
+        var panel = new Panel { Dock = DockStyle.Fill, Height = 76, Padding = new Padding(14, 12, 14, 12), BackColor = UiTheme.BgLight };
+        panel.Margin = Padding.Empty;
         var row = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.LeftToRight,
-            Dock          = DockStyle.Fill
+            Dock          = DockStyle.Fill,
+            WrapContents  = false,
+            AutoScroll    = true
         };
         row.Controls.Add(Label("Tên role mới:"));
         _txtNewRole = TB(150); row.Controls.Add(_txtNewRole);
-        _btnCreateRole  = Btn("➕ Tạo Role",   Color.Green);
-        _btnDropRole    = Btn("🗑 Drop Role",   Color.Crimson);
-        _btnRefreshRoles= Btn("🔄 Refresh",     Color.SteelBlue);
+        _btnCreateRole  = Btn("+ Tạo Role", UiTheme.HealthGreen, 140);
+        _btnDropRole    = Btn("Drop Role", UiTheme.Danger, 130);
+        _btnRefreshRoles= Btn("Refresh", UiTheme.Primary, 120);
         _btnCreateRole.Click   += BtnCreateRole_Click;
         _btnDropRole.Click     += BtnDropRole_Click;
         _btnRefreshRoles.Click += (_, _) => LoadRoles();
         row.Controls.AddRange(new Control[] { _btnCreateRole, _btnDropRole, _btnRefreshRoles });
         panel.Controls.Add(row);
 
-        page.Controls.Add(_dgvRoles);
-        page.Controls.Add(panel);
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 76));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.Controls.Add(panel, 0, 0);
+        layout.Controls.Add(_dgvRoles, 0, 1);
+        page.Controls.Add(layout);
         page.Enter += (_, _) => LoadRoles();
         return page;
     }
@@ -505,17 +554,18 @@ public class AdminDashboard : Form
     // ═══════════════════════════════════════════════════════════════════════════
     private TabPage BuildGrantTab()
     {
-        var page = new TabPage("✅ Grant");
+        var page = new TabPage("Grant");
         page.AutoScroll = true;
+        page.Padding = new Padding(14, 10, 14, 14);
 
         int y = 10;
         // Grantee
         page.Controls.Add(Lbl("Cấp cho (User/Role):", 10, y));
-        _cmbGrantee = Cmb(160, y, 200); page.Controls.Add(_cmbGrantee);
+        _cmbGrantee = Cmb(200, y, 240); page.Controls.Add(_cmbGrantee);
 
         // Loại grant
-        page.Controls.Add(Lbl("Loại:", 375, y));
-        _cmbGrantType = new ComboBox { Location = new Point(420, y), Size = new Size(150, 24) };
+        page.Controls.Add(Lbl("Loại:", 470, y));
+        _cmbGrantType = new ComboBox { Location = new Point(520, y), Size = new Size(180, 30) };
         _cmbGrantType.Items.AddRange(new[] { "Object Privilege", "System Privilege", "Role" });
         _cmbGrantType.DropDownStyle = ComboBoxStyle.DropDownList;
         _cmbGrantType.SelectedIndex = 0;
@@ -526,34 +576,35 @@ public class AdminDashboard : Form
         // ── Object Privilege panel ──────────────────────────────────────────
         _pnlObjectPriv = new Panel
         {
-            Location = new Point(10, y), Size = new Size(980, 260),
-            BorderStyle = BorderStyle.FixedSingle
+            Location = new Point(10, y), Size = new Size(980, 320),
+            BorderStyle = BorderStyle.FixedSingle,
+            BackColor = UiTheme.Surface
         };
         _pnlObjectPriv.Controls.Add(new Label
         {
             Text = "OBJECT PRIVILEGE", Font = UiTheme.LabelBold(),
-            Location = new Point(10, 5), AutoSize = true, ForeColor = Color.Navy
+            Location = new Point(10, 5), AutoSize = true, ForeColor = UiTheme.Primary
         });
         int py = 30;
         _pnlObjectPriv.Controls.Add(Lbl("Loại đối tượng:", 10, py));
-        _cmbObjType = new ComboBox { Location = new Point(130, py), Size = new Size(130, 24) };
+        _cmbObjType = new ComboBox { Location = new Point(150, py), Size = new Size(150, 30) };
         _cmbObjType.Items.AddRange(new[] { "TABLE", "VIEW", "PROCEDURE", "FUNCTION" });
         _cmbObjType.DropDownStyle = ComboBoxStyle.DropDownList;
         _cmbObjType.SelectedIndex = 0;
         _cmbObjType.SelectedIndexChanged += CmbObjType_Changed;
         _pnlObjectPriv.Controls.Add(_cmbObjType);
 
-        _pnlObjectPriv.Controls.Add(Lbl("Schema:", 280, py));
-        _cmbObjSchema = Cmb(330, py, 150); _cmbObjSchema.SelectedIndexChanged += LoadObjectNames;
+        _pnlObjectPriv.Controls.Add(Lbl("Schema:", 330, py));
+        _cmbObjSchema = Cmb(430, py, 190); _cmbObjSchema.SelectedIndexChanged += LoadObjectNames;
         _pnlObjectPriv.Controls.Add(_cmbObjSchema);
 
-        _pnlObjectPriv.Controls.Add(Lbl("Đối tượng:", 500, py));
-        _cmbObjName = Cmb(570, py, 180); _cmbObjName.SelectedIndexChanged += LoadColumns;
+        _pnlObjectPriv.Controls.Add(Lbl("Đối tượng:", 650, py));
+        _cmbObjName = Cmb(770, py, 240); _cmbObjName.SelectedIndexChanged += LoadColumns;
         _pnlObjectPriv.Controls.Add(_cmbObjName);
 
         py += 35;
         _pnlObjectPriv.Controls.Add(Lbl("Quyền:", 10, py));
-        _cmbPrivilege = new ComboBox { Location = new Point(80, py), Size = new Size(150, 24) };
+        _cmbPrivilege = new ComboBox { Location = new Point(90, py), Size = new Size(160, 30) };
         _cmbPrivilege.DropDownStyle = ComboBoxStyle.DropDownList;
         _cmbPrivilege.SelectedIndexChanged += CmbPrivilege_Changed;
         _pnlObjectPriv.Controls.Add(_cmbPrivilege);
@@ -562,7 +613,7 @@ public class AdminDashboard : Form
         _chkGrantOption = new CheckBox
         {
             Text     = "WITH GRANT OPTION",
-            Location = new Point(250, py),
+            Location = new Point(285, py),
             AutoSize = true,
             Font     = UiTheme.Body()
         };
@@ -582,14 +633,14 @@ public class AdminDashboard : Form
         _clbColumns = new CheckedListBox
         {
             Location      = new Point(10, py),
-            Size          = new Size(820, 90),
+            Size          = new Size(820, 104),
             CheckOnClick  = true,
             ScrollAlwaysVisible = false
         };
         _pnlObjectPriv.Controls.Add(_clbColumns);
 
-        py += 100;
-        _btnGrant = Btn("✅ Thực hiện GRANT", Color.DarkGreen, width: 180);
+        py += 116;
+        _btnGrant = Btn("Thực hiện GRANT", UiTheme.HealthGreen, width: 190);
         _btnGrant.Location = new Point(10, py);
         _btnGrant.Click += BtnGrant_Click;
         _pnlObjectPriv.Controls.Add(_btnGrant);
@@ -599,16 +650,17 @@ public class AdminDashboard : Form
         // ── System Privilege panel ─────────────────────────────────────────
         _pnlSysPriv = new Panel
         {
-            Location = new Point(10, y), Size = new Size(980, 120),
-            BorderStyle = BorderStyle.FixedSingle, Visible = false
+            Location = new Point(10, y), Size = new Size(980, 148),
+            BorderStyle = BorderStyle.FixedSingle, Visible = false,
+            BackColor = UiTheme.Surface
         };
         _pnlSysPriv.Controls.Add(new Label
         {
             Text = "SYSTEM PRIVILEGE", Font = UiTheme.LabelBold(),
-            Location = new Point(10, 5), AutoSize = true, ForeColor = Color.Navy
+            Location = new Point(10, 5), AutoSize = true, ForeColor = UiTheme.Primary
         });
         _pnlSysPriv.Controls.Add(Lbl("Quyền hệ thống:", 10, 35));
-        _cmbSysPriv = new ComboBox { Location = new Point(130, 35), Size = new Size(250, 24) };
+        _cmbSysPriv = new ComboBox { Location = new Point(155, 35), Size = new Size(280, 30) };
         _cmbSysPriv.DropDownStyle = ComboBoxStyle.DropDownList;
         _cmbSysPriv.Items.AddRange(new[]
         {
@@ -617,10 +669,10 @@ public class AdminDashboard : Form
             "ALTER USER","GRANT ANY PRIVILEGE","DBA","CONNECT","RESOURCE"
         });
         _pnlSysPriv.Controls.Add(_cmbSysPriv);
-        var chkAdminOpt = new CheckBox { Text = "WITH ADMIN OPTION", Location = new Point(400, 35), AutoSize = true };
+        var chkAdminOpt = new CheckBox { Text = "WITH ADMIN OPTION", Location = new Point(455, 35), AutoSize = true };
         _pnlSysPriv.Controls.Add(chkAdminOpt);
-        var btnGrantSys = Btn("✅ GRANT", Color.DarkGreen);
-        btnGrantSys.Location = new Point(10, 70);
+        var btnGrantSys = Btn("GRANT", UiTheme.HealthGreen);
+        btnGrantSys.Location = new Point(10, 82);
         btnGrantSys.Click += (_, _) =>
         {
             TryCatch(() =>
@@ -638,19 +690,20 @@ public class AdminDashboard : Form
         // ── Role grant panel ───────────────────────────────────────────────
         _pnlRole = new Panel
         {
-            Location = new Point(10, y), Size = new Size(980, 90),
-            BorderStyle = BorderStyle.FixedSingle, Visible = false
+            Location = new Point(10, y), Size = new Size(980, 118),
+            BorderStyle = BorderStyle.FixedSingle, Visible = false,
+            BackColor = UiTheme.Surface
         };
         _pnlRole.Controls.Add(new Label
         {
             Text = "GRANT ROLE", Font = UiTheme.LabelBold(),
-            Location = new Point(10, 5), AutoSize = true, ForeColor = Color.Navy
+            Location = new Point(10, 5), AutoSize = true, ForeColor = UiTheme.Primary
         });
         _pnlRole.Controls.Add(Lbl("Role:", 10, 35));
         _cmbGrantRole = Cmb(70, 35, 200);
         _pnlRole.Controls.Add(_cmbGrantRole);
-        var btnGrantRole = Btn("✅ GRANT ROLE", Color.DarkGreen);
-        btnGrantRole.Location = new Point(290, 30);
+        var btnGrantRole = Btn("GRANT ROLE", UiTheme.HealthGreen, 140);
+        btnGrantRole.Location = new Point(290, 32);
         btnGrantRole.Click += (_, _) =>
         {
             TryCatch(() =>
@@ -663,6 +716,23 @@ public class AdminDashboard : Form
         };
         _pnlRole.Controls.Add(btnGrantRole);
         page.Controls.Add(_pnlRole);
+
+        void resizeGrantPanels()
+        {
+            if (_pnlObjectPriv is null || _pnlSysPriv is null || _pnlRole is null || _clbColumns is null)
+                return;
+
+            var panelWidth = Math.Max(760, page.ClientSize.Width - 40);
+            _pnlObjectPriv.Width = panelWidth;
+            _pnlObjectPriv.Height = 320;
+            _pnlSysPriv.Width = panelWidth;
+            _pnlSysPriv.Height = 148;
+            _pnlRole.Width = panelWidth;
+            _pnlRole.Height = 118;
+            _clbColumns.Width = Math.Max(360, panelWidth - 180);
+        }
+        page.Resize += (_, _) => resizeGrantPanels();
+        resizeGrantPanels();
 
         page.Enter += (_, _) =>
         {
@@ -699,6 +769,10 @@ public class AdminDashboard : Form
 
     private void CmbPrivilege_Changed(object? s, EventArgs e)
     {
+        // Guard: handler có thể fire khi BuildGrantTab() set SelectedIndex
+        // TRƯỚC khi _clbColumns/_lblColNote được khởi tạo.
+        if (_clbColumns is null || _lblColNote is null) return;
+
         var priv = _cmbPrivilege.Text;
         bool canCol = priv is "SELECT" or "UPDATE";
         _clbColumns.Enabled = canCol;
@@ -826,19 +900,22 @@ public class AdminDashboard : Form
     // ═══════════════════════════════════════════════════════════════════════════
     private TabPage BuildRevokeTab()
     {
-        var page = new TabPage("❌ Revoke");
+        var page = new TabPage("Revoke");
 
         var topPanel = new FlowLayoutPanel
         {
             Dock      = DockStyle.Top,
-            Height    = 45,
-            Padding   = new Padding(8),
-            FlowDirection = FlowDirection.LeftToRight
+            Height    = 62,
+            Padding   = new Padding(8, 8, 8, 10),
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            AutoScroll = true,
+            BackColor = UiTheme.BgLight
         };
         topPanel.Controls.Add(Lbl("User/Role:"));
         _cmbRevokeFrom = Cmb(0, 0, 200);
         topPanel.Controls.Add(_cmbRevokeFrom);
-        _btnLoadGranted = Btn("🔍 Tải quyền", Color.SteelBlue);
+        _btnLoadGranted = Btn("Tải quyền", UiTheme.Primary, 120);
         _btnLoadGranted.Click += (_, _) => LoadGrantedPrivileges();
         topPanel.Controls.Add(_btnLoadGranted);
 
@@ -848,14 +925,25 @@ public class AdminDashboard : Form
         });
         _dgvGranted.Dock = DockStyle.Fill;
 
-        var botPanel = new Panel { Dock = DockStyle.Bottom, Height = 45, Padding = new Padding(8) };
-        _btnRevoke = Btn("❌ Revoke đã chọn", Color.Crimson, width: 160);
+        var botPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 58,
+            Padding = new Padding(8, 6, 8, 10),
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            AutoScroll = true,
+            BackColor = UiTheme.BgLight
+        };
+        _btnRevoke = Btn("Revoke đã chọn", UiTheme.Danger, width: 175);
         _btnRevoke.Click += BtnRevoke_Click;
         botPanel.Controls.Add(_btnRevoke);
 
         page.Controls.Add(_dgvGranted);
         page.Controls.Add(botPanel);
         page.Controls.Add(topPanel);
+        botPanel.BringToFront();
+        topPanel.BringToFront();
 
         page.Enter += (_, _) => RefreshRevokeGrantees();
         return page;
@@ -931,16 +1019,19 @@ public class AdminDashboard : Form
     // ═══════════════════════════════════════════════════════════════════════════
     private TabPage BuildViewPrivTab()
     {
-        var page = new TabPage("🔍 View Privileges");
+        var page = new TabPage("View Privileges");
 
         var top = new FlowLayoutPanel
         {
-            Dock = DockStyle.Top, Height = 45, Padding = new Padding(8),
-            FlowDirection = FlowDirection.LeftToRight
+            Dock = DockStyle.Top, Height = 62, Padding = new Padding(8, 8, 8, 10),
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            AutoScroll = true,
+            BackColor = UiTheme.BgLight
         };
         top.Controls.Add(Lbl("User/Role:"));
         _cmbViewTarget = Cmb(0, 0, 200); top.Controls.Add(_cmbViewTarget);
-        _btnViewRefresh = Btn("🔍 Xem quyền", Color.SteelBlue);
+        _btnViewRefresh = Btn("Xem quyền", UiTheme.Primary, 120);
         _btnViewRefresh.Click += (_, _) => LoadPrivilegeDetail();
         top.Controls.Add(_btnViewRefresh);
 
@@ -997,17 +1088,8 @@ public class AdminDashboard : Form
     // ═══════════════════════════════════════════════════════════════════════════
     private static DataGridView MakeGrid(string[] columns)
     {
-        var dgv = new DataGridView
-        {
-            ReadOnly          = true,
-            AllowUserToAddRows= false,
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells,
-            SelectionMode     = DataGridViewSelectionMode.FullRowSelect,
-            MultiSelect       = false,
-            BackgroundColor   = Color.White,
-            BorderStyle       = BorderStyle.None,
-            RowHeadersVisible = false
-        };
+        var dgv = UiTheme.Grid();
+        dgv.MultiSelect = false;
         return dgv;
     }
 
@@ -1023,20 +1105,35 @@ public class AdminDashboard : Form
 
     private static Label Label(string text) =>
         new() { Text = text, AutoSize = true, Font = UiTheme.Body(),
-                Padding = new Padding(0, 5, 0, 0) };
+                Padding = new Padding(0, 8, 0, 0) };
 
     private static TextBox TB(int width, bool isPass = false) =>
-        new() { Width = width, Height = 24, Font = UiTheme.Body(),
+        new() { Width = width, Height = 30, Font = UiTheme.Body(),
                 PasswordChar = isPass ? '●' : '\0', BorderStyle = BorderStyle.FixedSingle };
 
-    private static Button Btn(string text, Color backColor, int width = 120) =>
-        new() { Text = text, Width = width, Height = 30, BackColor = backColor,
-                ForeColor = Color.White, FlatStyle = FlatStyle.Flat,
-                Font = UiTheme.Body(), Cursor = Cursors.Hand,
-                Padding = new Padding(2) };
+    private static Button Btn(string text, Color backColor, int width = 120)
+    {
+        var btn = new Button
+        {
+            Text = text,
+            Width = width,
+            Height = 38,
+            MinimumSize = new Size(width, 38),
+            BackColor = backColor,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Font = UiTheme.Body(),
+            Cursor = Cursors.Hand,
+            Padding = new Padding(8, 0, 8, 0),
+            TextAlign = ContentAlignment.MiddleCenter,
+            UseCompatibleTextRendering = false
+        };
+        btn.FlatAppearance.BorderSize = 0;
+        return btn;
+    }
 
     private static ComboBox Cmb(int x, int y, int width) =>
-        new() { Location = new Point(x, y), Size = new Size(width, 24),
+        new() { Location = new Point(x, y), Size = new Size(width, 30),
                 DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Body() };
 
     private void TryCatch(Action action,

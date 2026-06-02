@@ -32,15 +32,23 @@ public sealed class MyProfilePanel : UserControl
 
     private void Build()
     {
+        var scroll = new Panel
+        {
+            Dock = DockStyle.Fill,
+            AutoScroll = true,
+            BackColor = UiTheme.Surface
+        };
+
         var fl = new FlowLayoutPanel
         {
             Dock = DockStyle.Top, FlowDirection = FlowDirection.TopDown,
-            AutoSize = true, Padding = new Padding(0)
+            AutoSize = true, Padding = new Padding(0),
+            WrapContents = false
         };
 
         fl.Controls.Add(UiTheme.SectionLabel("Thông tin định danh (chỉ đọc)"));
 
-        var roGrid = new TableLayoutPanel { ColumnCount = 2, AutoSize = true };
+        var roGrid = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, Margin = new Padding(0, 2, 0, 12) };
         roGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
         roGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
@@ -69,7 +77,7 @@ public sealed class MyProfilePanel : UserControl
 
         fl.Controls.Add(UiTheme.SectionLabel("Thông tin có thể cập nhật"));
 
-        var rwGrid = new TableLayoutPanel { ColumnCount = 2, AutoSize = true };
+        var rwGrid = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, Margin = new Padding(0, 2, 0, 0) };
         rwGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
         rwGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
@@ -95,7 +103,8 @@ public sealed class MyProfilePanel : UserControl
         };
         fl.Controls.Add(info);
 
-        Controls.Add(fl);
+        scroll.Controls.Add(fl);
+        Controls.Add(scroll);
     }
 
     private static Label RoValue() => new()

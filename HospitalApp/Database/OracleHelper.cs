@@ -109,11 +109,27 @@ public class OracleHelper
     // ── Kiểm tra DBA privilege ────────────────────────────────────────────────
     public bool IsDba()
     {
+        // SYS / SYSTEM luôn là DBA
+        if (Username.Equals("SYS", StringComparison.OrdinalIgnoreCase) ||
+            Username.Equals("SYSTEM", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Check user có DBA role được grant
         try
         {
             var result = Scalar(
-                "SELECT COUNT(*) FROM SESSION_PRIVS WHERE PRIVILEGE = 'DBA'");
-            return Convert.ToInt32(result) > 0;
+                "SELECT COUNT(*) FROM USER_ROLE_PRIVS WHERE GRANTED_ROLE = 'DBA'");
+            if (Convert.ToInt32(result) > 0) return true;
+        }
+        catch { /* ignore */ }
+
+        // Fallback: check một số DBA-typical privileges qua SESSION_PRIVS
+        try
+        {
+            var result = Scalar(
+                "SELECT COUNT(*) FROM SESSION_PRIVS " +
+                "WHERE PRIVILEGE IN ('CREATE ANY TABLE', 'ALTER SYSTEM', 'DROP USER', 'GRANT ANY ROLE')");
+            return Convert.ToInt32(result) >= 2;
         }
         catch { return false; }
     }

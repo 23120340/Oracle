@@ -17,12 +17,12 @@ public class KpiCard : Card
 
     public KpiCard()
     {
-        Padding = new Padding(20, 16, 20, 16);
+        Padding = new Padding(20, 14, 20, 14);
         ShowShadow = true;
         ShadowDepth = 4;
         CornerRadius = UiTheme.RadiusLg;
         BorderWidth = 0;
-        Height = 100;
+        Height = 118;          // tăng từ 100 → 118 để 3 dòng không đè nhau
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -33,9 +33,10 @@ public class KpiCard : Card
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
         var pad = Padding;
-        // Icon top-right (subtle background pill)
-        using var iconFont = IconRegistry.Icon(22f);
-        var iconBg = new Rectangle(Width - 56, pad.Top, 36, 36);
+
+        // 1) Icon top-right (pill nền nhạt)
+        using var iconFont = IconRegistry.Icon(20f);
+        var iconBg = new Rectangle(Width - 50, pad.Top, 34, 34);
         using (var b = new SolidBrush(Color.FromArgb(35, GlyphColor)))
         using (var p = Card.RoundedRect(iconBg, 10)) g.FillPath(b, p);
         using (var b = new SolidBrush(GlyphColor))
@@ -46,22 +47,24 @@ public class KpiCard : Card
                 iconBg.Y + (iconBg.Height - sz.Height) / 2);
         }
 
-        // Label (top)
-        using var labelFont = UiTheme.Label(9.5f);
+        // 2) Label (top) — không đè icon: max width = card width - 60 (icon zone)
+        var labelMaxW = Width - pad.Left - 60;
+        using var labelFont = UiTheme.LabelBold(9.5f);
         using var labelBrush = new SolidBrush(UiTheme.TextMuted);
-        g.DrawString(Label, labelFont, labelBrush, pad.Left, pad.Top + 2);
+        g.DrawString(Label, labelFont, labelBrush,
+            new RectangleF(pad.Left, pad.Top, labelMaxW, 18));
 
-        // Value (huge)
-        using var valueFont = UiTheme.Heading1(26f);
+        // 3) Value (số to) — y cố định từ top, font 22pt (giảm từ 26pt)
+        using var valueFont = UiTheme.Heading1(22f);
         using var valueBrush = new SolidBrush(ValueColor);
-        g.DrawString(Value, valueFont, valueBrush, pad.Left, pad.Top + 22);
+        g.DrawString(Value, valueFont, valueBrush, pad.Left, pad.Top + 24);
 
-        // Subtext (bottom)
+        // 4) Subtext — y cố định, đảm bảo cách value 1 dòng
         if (!string.IsNullOrEmpty(Subtext))
         {
             using var subFont = UiTheme.Body(8.5f);
             using var subBrush = new SolidBrush(UiTheme.TextMuted);
-            g.DrawString(Subtext, subFont, subBrush, pad.Left, Height - pad.Bottom - 16);
+            g.DrawString(Subtext, subFont, subBrush, pad.Left, pad.Top + 68);
         }
     }
 }
@@ -97,19 +100,22 @@ public class StatusBar : Panel
         {
             Dock = DockStyle.Left, Width = 350,
             Font = UiTheme.Body(8.5f), ForeColor = UiTheme.TextMuted,
-            TextAlign = ContentAlignment.MiddleLeft
+            TextAlign = ContentAlignment.MiddleLeft,
+            AutoEllipsis = true
         };
         _lblCenter = new Label
         {
             Dock = DockStyle.Fill,
             Font = UiTheme.Body(8.5f), ForeColor = UiTheme.TextMuted,
-            TextAlign = ContentAlignment.MiddleCenter
+            TextAlign = ContentAlignment.MiddleCenter,
+            AutoEllipsis = true
         };
         _lblRight = new Label
         {
             Dock = DockStyle.Right, Width = 120,
             Font = UiTheme.Body(8.5f), ForeColor = UiTheme.TextMuted,
-            TextAlign = ContentAlignment.MiddleRight
+            TextAlign = ContentAlignment.MiddleRight,
+            AutoEllipsis = true
         };
         Controls.Add(_lblCenter);
         Controls.Add(_lblRight);
@@ -123,6 +129,16 @@ public class StatusBar : Panel
         _clock.Start();
         _lblRight.Text = $"{IconRegistry.Clock}  {DateTime.Now:HH:mm:ss}";
         _lblRight.Font = IconRegistry.Icon(9f);
+        Resize += (_, _) => LayoutLabels();
+        LayoutLabels();
+    }
+
+    private void LayoutLabels()
+    {
+        var available = Math.Max(0, Width - Padding.Horizontal);
+        _lblRight.Width = available < 520 ? 86 : 120;
+        _lblLeft.Width = available < 520 ? Math.Max(120, available / 2) : Math.Min(350, Math.Max(180, available / 3));
+        _lblCenter.Visible = available >= 420;
     }
 
     protected override void OnPaint(PaintEventArgs e)

@@ -96,7 +96,8 @@ public class KTVForm : Form
         {
             Text = title, Dock = DockStyle.Left, Width = 300,
             Font = UiTheme.Heading2(), ForeColor = UiTheme.TextDark,
-            TextAlign = ContentAlignment.MiddleLeft
+            TextAlign = ContentAlignment.MiddleLeft,
+            AutoEllipsis = true
         };
         var roleChip = new RoleChip
         {
@@ -121,6 +122,7 @@ public class KTVForm : Form
         {
             btnLogout.Location = new Point(header.Width - btnLogout.Width - 16, 12);
             roleChip.Location  = new Point(btnLogout.Left - roleChip.Width - 12, 17);
+            lblTitle.Width = Math.Max(140, roleChip.Left - lblTitle.Left - 16);
         }
         header.Resize += (_, _) => layout();
         roleChip.HandleCreated += (_, _) => layout();
@@ -133,14 +135,14 @@ public class KTVForm : Form
 
     private TabPage BuildMyProfileTab()
     {
-        var p = new TabPage("👤 Thông tin của tôi");
+        var p = new TabPage("Thông tin của tôi");
         p.Controls.Add(new MyProfilePanel(_db));
         return p;
     }
 
     private TabPage BuildThongBaoTab()
     {
-        var page = new TabPage("📢 Thông báo");
+        var page = new TabPage("Thông báo");
         var lblLabel = new Label
         {
             Dock = DockStyle.Top,
@@ -150,20 +152,20 @@ public class KTVForm : Form
             ForeColor = Color.FromArgb(0, 90, 40),
             Text = "Nhãn OLS: (chưa tải)"
         };
-        var dgv = new DataGridView
-        {
-            Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells,
-            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-            BackgroundColor = Color.White, RowHeadersVisible = false,
-            Font = UiTheme.Body()
-        };
+        var dgv = UiTheme.Grid();
+        dgv.Dock = DockStyle.Fill;
         var btn = new Button
         {
-            Text = "🔄 Tải thông báo", Dock = DockStyle.Top, Height = 34,
-            BackColor = Color.SteelBlue, ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat, Font = UiTheme.Body(), Cursor = Cursors.Hand
+            Text = "Tải thông báo", Dock = DockStyle.Top, Height = 38,
+            BackColor = UiTheme.HealthCyan, ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat, Font = UiTheme.Body(), Cursor = Cursors.Hand,
+            Padding = new Padding(8, 0, 8, 0),
+            TextAlign = ContentAlignment.MiddleCenter,
+            UseCompatibleTextRendering = false
         };
+        btn.Width = 150;
+        btn.Height = 38;
+        btn.FlatAppearance.BorderSize = 0;
         btn.Click += (_, _) => TryCatch(() =>
         {
             lblLabel.Text = "Nhãn OLS: " + CurrentOlsLabel();
@@ -173,29 +175,53 @@ public class KTVForm : Form
                 "FROM BVADMIN.THONGBAO ORDER BY NGAYGIO DESC");
         });
 
-        page.Controls.Add(dgv);
-        page.Controls.Add(lblLabel);
-        page.Controls.Add(btn);
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        lblLabel.Dock = DockStyle.Fill;
+        btn.Dock = DockStyle.Fill;
+        dgv.Margin = Padding.Empty;
+        layout.Controls.Add(lblLabel, 0, 0);
+        layout.Controls.Add(btn, 0, 1);
+        layout.Controls.Add(dgv, 0, 2);
+        page.Controls.Add(layout);
         return page;
     }
 
     private TabPage BuildWorkTab()
     {
-        var page = new TabPage("🔬 Dịch vụ của tôi");
+        var page = new TabPage("Dịch vụ của tôi");
 
         // Toolbar
         var tool = new FlowLayoutPanel
         {
             Dock = DockStyle.Top, Height = 44, Padding = new Padding(6),
             FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            AutoScroll = true,
             BackColor = Color.FromArgb(235, 250, 235)
         };
         _btnRefresh = new Button
         {
-            Text = "🔄 Tải danh sách DV của tôi", Width = 220, Height = 32,
-            BackColor = Color.SteelBlue, ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat, Font = UiTheme.Body(), Cursor = Cursors.Hand
+            Text = "Tải danh sách DV của tôi", Width = 240, Height = 38,
+            BackColor = UiTheme.HealthCyan, ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat, Font = UiTheme.Body(), Cursor = Cursors.Hand,
+            Padding = new Padding(8, 0, 8, 0),
+            TextAlign = ContentAlignment.MiddleCenter,
+            UseCompatibleTextRendering = false
         };
+        _btnRefresh.Width = 240;
+        _btnRefresh.Height = 38;
+        _btnRefresh.FlatAppearance.BorderSize = 0;
         _btnRefresh.Click += (_, _) => LoadMyDV();
         tool.Controls.Add(_btnRefresh);
 
@@ -227,28 +253,45 @@ public class KTVForm : Form
 
         _btnSave = new Button
         {
-            Dock = DockStyle.Bottom, Text = "💾  Lưu Kết quả",
+            Dock = DockStyle.Bottom, Text = "Lưu kết quả",
             Height = 36, BackColor = Color.FromArgb(0, 140, 60),
             ForeColor = Color.White, FlatStyle = FlatStyle.Flat,
-            Font = UiTheme.Button(10f), Cursor = Cursors.Hand
+            Font = UiTheme.Button(10f), Cursor = Cursors.Hand,
+            Padding = new Padding(8, 0, 8, 0),
+            TextAlign = ContentAlignment.MiddleCenter,
+            UseCompatibleTextRendering = false
         };
+        _btnSave.Height = 38;
+        _btnSave.FlatAppearance.BorderSize = 0;
         _btnSave.Click += BtnSave_Click;
         bottom.Controls.Add(_btnSave);
 
         // Grid (Fill — phải add cuối cùng để chiếm phần còn lại)
-        _dgvDV = new DataGridView
-        {
-            Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells,
-            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-            BackgroundColor = Color.White, RowHeadersVisible = false,
-            Font = UiTheme.Body()
-        };
+        _dgvDV = UiTheme.Grid();
+        _dgvDV.Dock = DockStyle.Fill;
         _dgvDV.SelectionChanged += DgvDV_SelectionChanged;
 
-        page.Controls.Add(_dgvDV);
-        page.Controls.Add(bottom);
-        page.Controls.Add(tool);
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 150));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        tool.Dock = DockStyle.Fill;
+        tool.Margin = Padding.Empty;
+        _dgvDV.Margin = Padding.Empty;
+        bottom.Dock = DockStyle.Fill;
+        bottom.Margin = Padding.Empty;
+        layout.Controls.Add(tool, 0, 0);
+        layout.Controls.Add(_dgvDV, 0, 1);
+        layout.Controls.Add(bottom, 0, 2);
+        page.Controls.Add(layout);
         return page;
     }
 
@@ -331,7 +374,7 @@ public class KTVForm : Form
         try
         {
             return _db.Scalar(
-                "SELECT NVL(MAX(LABEL), '(chưa gán)') " +
+                "SELECT NVL(MAX(MAX_READ_LABEL), '(chưa gán)') " +
                 "FROM DBA_SA_USER_LABELS " +
                 "WHERE POLICY_NAME='BV_LABEL_POLICY' AND USER_NAME=USER")?.ToString() ?? "(chưa gán)";
         }

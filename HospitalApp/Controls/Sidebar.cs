@@ -28,7 +28,7 @@ public class Sidebar : Panel
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
-            AutoScroll = false,
+            AutoScroll = true,
             Padding = new Padding(8, 16, 8, 16),
             BackColor = UiTheme.SidebarBg
         };
@@ -199,6 +199,14 @@ public class SidebarItem : Control
         using var textFont = _isActive ? UiTheme.BodyBold() : UiTheme.Body();
         using var textBrush = new SolidBrush(
             _isActive ? UiTheme.SidebarActive : UiTheme.SidebarText);
-        g.DrawString(Text, textFont, textBrush, 40, (Height - textFont.Height) / 2f);
+        var textRect = new RectangleF(40, 0, Math.Max(0, Width - 52), Height);
+        using var format = new StringFormat
+        {
+            Alignment = StringAlignment.Near,
+            LineAlignment = StringAlignment.Center,
+            Trimming = StringTrimming.EllipsisCharacter,
+            FormatFlags = StringFormatFlags.NoWrap
+        };
+        g.DrawString(Text, textFont, textBrush, textRect, format);
     }
 }
