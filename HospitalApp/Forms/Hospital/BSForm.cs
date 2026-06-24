@@ -126,9 +126,10 @@ public class BSForm : Form
         var btnLogout = new RoundedButton
         {
             Text = "Đăng xuất", Glyph = IconRegistry.SignOut,
-            BackColor = UiTheme.BgLight, ForeColor = UiTheme.TextDark,
+            BackColor = UiTheme.Surface, ForeColor = UiTheme.TextDark,
             GlyphColor = UiTheme.Danger,
-            Width = 130, Height = 36,
+            BorderThickness = 1, BorderTint = UiTheme.BorderStrong,
+            CornerRadius = 0, Width = 152, Height = 38,
             Anchor = AnchorStyles.Right | AnchorStyles.Top
         };
         btnLogout.Click += (_, _) =>
@@ -137,15 +138,31 @@ public class BSForm : Form
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 Close();
         };
+        var btnChangePw = new RoundedButton
+        {
+            Text = "Đổi mật khẩu", Glyph = IconRegistry.Key,
+            BackColor = UiTheme.Surface, ForeColor = UiTheme.TextDark,
+            GlyphColor = UiTheme.Primary,
+            BorderThickness = 1, BorderTint = UiTheme.BorderStrong,
+            CornerRadius = 0, Width = 168, Height = 38,
+            Anchor = AnchorStyles.Right | AnchorStyles.Top
+        };
+        btnChangePw.Click += (_, _) =>
+        {
+            using var dlg = new ChangePasswordDialog(_db);
+            if (dlg.ShowDialog(this) == DialogResult.OK) Close();
+        };
         void layout()
         {
-            btnLogout.Location = new Point(header.Width - btnLogout.Width - 16, 12);
-            roleChip.Location  = new Point(btnLogout.Left - roleChip.Width - 12, 17);
+            btnLogout.Location   = new Point(header.Width - btnLogout.Width - 16, 11);
+            btnChangePw.Location = new Point(btnLogout.Left - btnChangePw.Width - 8, 11);
+            roleChip.Location    = new Point(btnChangePw.Left - roleChip.Width - 12, 16);
             lblTitle.Width = Math.Max(140, roleChip.Left - lblTitle.Left - 16);
         }
         header.Resize += (_, _) => layout();
         roleChip.HandleCreated += (_, _) => layout();
         header.Controls.Add(roleChip);
+        header.Controls.Add(btnChangePw);
         header.Controls.Add(btnLogout);
         header.Controls.Add(lblTitle);
         layout();

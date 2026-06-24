@@ -103,8 +103,17 @@ public class RoundedButton : Button
     private void ApplyRegion()
     {
         if (Width <= 0 || Height <= 0) return;
+        if (CornerRadius <= 0) { Region = null; return; }   // khối vuông: không cần clip góc
         using var path = Card.RoundedRect(new Rectangle(0, 0, Width, Height), CornerRadius);
         Region = new Region(path);
+    }
+
+    // Đường biên thân nút: hình chữ nhật khi CornerRadius<=0 (khối vuông), ngược lại bo góc.
+    private static GraphicsPath RectPath(Rectangle r)
+    {
+        var p = new GraphicsPath();
+        p.AddRectangle(r);
+        return p;
     }
 
     protected override void OnHandleCreated(EventArgs e)
@@ -120,7 +129,7 @@ public class RoundedButton : Button
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
         var rect = new Rectangle(0, 0, Width - 1, Height - 1);
-        using var path = Card.RoundedRect(rect, CornerRadius);
+        using var path = CornerRadius <= 0 ? RectPath(rect) : Card.RoundedRect(rect, CornerRadius);
 
         var bg = _hover && Enabled
             ? (HoverColor == Color.Empty ? Darken(BackColor, 0.12f) : HoverColor)
@@ -137,7 +146,9 @@ public class RoundedButton : Button
             if (br.Width > 0 && br.Height > 0)
             {
                 using var bpen = new Pen(BorderTint, BorderThickness);
-                using var bpath = Card.RoundedRect(br, Math.Max(1, CornerRadius - ins));
+                using var bpath = CornerRadius <= 0
+                    ? RectPath(br)
+                    : Card.RoundedRect(br, Math.Max(1, CornerRadius - ins));
                 g.DrawPath(bpen, bpath);
             }
         }

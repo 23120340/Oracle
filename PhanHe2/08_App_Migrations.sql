@@ -83,11 +83,18 @@ GRANT EXECUTE ON sp_log_login TO PUBLIC;
 -- ============================================================
 CONNECT SYSTEM/oracle;
 GRANT CREATE USER TO BVADMIN;
+-- FIX: proc chạy definer-rights dưới BVADMIN cần cấp CREATE SESSION (TRỰC TIẾP) cho BN mới.
+-- BVADMIN không thể cấp CREATE SESSION nếu không có ADMIN OPTION → cấp ở đây.
+-- (GRANT ANY ROLE đã có từ file 02 → cấp BenhNhan_Role được.)
+GRANT CREATE SESSION TO BVADMIN WITH ADMIN OPTION;
 
 CONNECT BVADMIN/"BVAdmin@2025";
 
+-- p_mabn IN OUT: truyền NULL → proc TỰ SINH mã (fn_next_mabn) rồi trả về mã đã tạo.
+-- Thứ tự AN TOÀN: tạo tài khoản TRƯỚC (DDL tự commit) rồi mới INSERT bệnh nhân; nếu bất kỳ
+-- bước nào lỗi → DROP USER dọn tài khoản dở (đảm bảo all-or-nothing, không để tài khoản mồ côi).
 CREATE OR REPLACE PROCEDURE sp_create_benhnhan_full(
-    p_mabn       IN VARCHAR2,
+    p_mabn       IN OUT VARCHAR2,
     p_tenbn      IN NVARCHAR2,
     p_phai       IN CHAR,
     p_ngaysinh   IN DATE,
@@ -98,28 +105,47 @@ CREATE OR REPLACE PROCEDURE sp_create_benhnhan_full(
     p_tinhtp     IN NVARCHAR2 DEFAULT NULL,
     p_password   IN VARCHAR2 DEFAULT 'BV@2025!'
 ) AS
-    v_username VARCHAR2(100);
+    v_username VARCHAR2(128);
+    v_cnt      PLS_INTEGER;
 BEGIN
-    -- 1. Insert vào BENHNHAN
-    INSERT INTO BENHNHAN(MABN, TENBN, PHAI, NGAYSINH, CCCD,
-                         SONHA, TENDUONG, QUANHUYEN, TINHTP)
-    VALUES (p_mabn, p_tenbn, p_phai, p_ngaysinh, p_cccd,
-            p_sonha, p_tenduong, p_quanhuyen, p_tinhtp);
-
-    -- 2. Tạo Oracle account
+    -- 1. Tự sinh MABN nếu không truyền vào
+    IF p_mabn IS NULL OR TRIM(p_mabn) IS NULL THEN
+        p_mabn := fn_next_mabn();
+    END IF;
     v_username := 'BN_' || p_mabn;
+
+    -- 2. Kiểm tra trùng (fail-fast, CHƯA tạo gì)
+    SELECT COUNT(*) INTO v_cnt FROM BENHNHAN WHERE MABN = p_mabn;
+    IF v_cnt > 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Mã bệnh nhân ' || p_mabn || ' đã tồn tại.');
+    END IF;
+    SELECT COUNT(*) INTO v_cnt FROM BENHNHAN WHERE CCCD = p_cccd;
+    IF v_cnt > 0 THEN
+        RAISE_APPLICATION_ERROR(-20002, 'CCCD ' || p_cccd || ' đã được đăng ký cho bệnh nhân khác.');
+    END IF;
+    SELECT COUNT(*) INTO v_cnt FROM ALL_USERS WHERE USERNAME = UPPER(v_username);
+    IF v_cnt > 0 THEN
+        RAISE_APPLICATION_ERROR(-20003, 'Tài khoản ' || v_username || ' đã tồn tại.');
+    END IF;
+
+    -- 3. Tạo tài khoản TRƯỚC (DDL tự commit → làm trước thì chưa có dữ liệu BN để mất)
     EXECUTE IMMEDIATE 'CREATE USER ' || v_username ||
                       ' IDENTIFIED BY "' || p_password || '"' ||
                       ' DEFAULT TABLESPACE USERS QUOTA 0 ON USERS';
     EXECUTE IMMEDIATE 'GRANT CREATE SESSION TO ' || v_username;
     EXECUTE IMMEDIATE 'GRANT BenhNhan_Role TO ' || v_username;
 
-    -- 3. Cập nhật ORACLE_USER liên kết (TC#1)
-    UPDATE BENHNHAN
-    SET    ORACLE_USER = v_username
-    WHERE  MABN = p_mabn;
-
+    -- 4. Lưu bệnh nhân + liên kết tài khoản (ORACLE_USER) trong cùng giao dịch
+    INSERT INTO BENHNHAN(MABN, TENBN, PHAI, NGAYSINH, CCCD,
+                         SONHA, TENDUONG, QUANHUYEN, TINHTP, ORACLE_USER)
+    VALUES (p_mabn, p_tenbn, p_phai, p_ngaysinh, p_cccd,
+            p_sonha, p_tenduong, p_quanhuyen, p_tinhtp, v_username);
     COMMIT;
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Dọn tài khoản tạo dở (nếu đã CREATE USER) → tránh tài khoản mồ côi
+        BEGIN EXECUTE IMMEDIATE 'DROP USER ' || v_username; EXCEPTION WHEN OTHERS THEN NULL; END;
+        RAISE;
 END sp_create_benhnhan_full;
 /
 

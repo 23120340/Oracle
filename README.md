@@ -41,10 +41,12 @@ Oracle/
 │   ├── 11_NV_Lookup_Grants.sql  ← NV_LOOKUP_View (DPV/BS tra cứu nhân viên)
 │   ├── 12_Fix_UTF8_Data.sql     ← Sửa dữ liệu tiếng Việt nếu bị lệch encoding
 │   ├── 13_Audit_Grants.sql      ← Grant SELECT các bảng log
+│   ├── 15_TDE_Encryption.sql    ← (Mở rộng) Mã hóa cột nhạy cảm at-rest bằng TDE
 │   ├── setup_all.sql            ← Tổng hợp view + grant (chạy SAU CÙNG, bằng BVADMIN)
 │   ├── setup_admin_user.sql     ← Tạo HOSPITAL_DBA (tài khoản vào AdminDashboard)
 │   ├── fix_fga_ora28138.sql     ← Hotfix ORA-28138 (FGA predicate đơn) — chạy bằng BVADMIN, không cần -Reset
 │   ├── fix_ols_thongbao.sql     ← Hotfix gán nhãn OLS cho THONGBAO (u1–u8 không thấy thông báo)
+│   ├── fix_benhnhan_account.sql ← Hotfix: DPV tạo BN mới + tự tạo tài khoản đăng nhập (auto-MABN)
 │   ├── run_migrations.ps1       ← Runner chạy 01→13 + setup_all
 │   └── REVIEW_LOI_PHANHE2.md    ← Báo cáo rà soát lỗi + trạng thái sửa (checklist)
 │
@@ -266,6 +268,11 @@ Giao diện **AdminDashboard** cho DBA:
 **TC#1:** DBA tạo Oracle account cho mọi nhân viên/bệnh nhân; lưu tên tài khoản vào cột `ORACLE_USER`
 → nhận diện người dùng chỉ cần **1 bảng**: `WHERE ORACLE_USER = SYS_CONTEXT('USERENV','SESSION_USER')`.
 
+> 🔒 **MÃBN bất biến:** `MABN` là khoá chính + cơ sở tên tài khoản `BN_<MABN>` (TC#1) + bị `HSBA` tham
+> chiếu (FK). Khi DPV tạo BN mới, mã **tự sinh** (`SEQ_BENHNHAN`) và **không cho sửa** — chặn ở app (ô khoá)
+> lẫn DB (trigger `trg_benhnhan_mabn_immutable` raise `ORA-20010` nếu `UPDATE` đổi MABN). DPV vẫn "sửa dữ
+> liệu BENHNHAN" (TC#2) ở các trường khác. TC#5 cũng quy định bệnh nhân không được sửa mã. → Phù hợp đề bài.
+
 **Câu 2 — RBAC** (Kỹ thuật viên, Bệnh nhân):
 
 | Role | Cơ chế | Quyền |
@@ -330,6 +337,17 @@ User u1–u8 được gán `max_read_label` tương ứng (xem file 05). User u1
 | Data Pump (expdp) | Logical | Job Scheduler gọi `.bat` |
 | Flashback Table / Query | Point-in-time | Dùng undo + ROW MOVEMENT — demo ở `09_Recovery_Demo.sql` |
 
+### (Mở rộng) Mã hóa — Cryptography
+
+Bổ sung tầng **mã hóa** cho access-control (để có cả *access control + cryptography*):
+
+- **Mã hóa đường truyền** — Oracle Native Network Encryption (AES256 + SHA) qua `sqlnet.ora`. App `Oracle.ManagedDataAccess` tự thương lượng, không sửa code.
+- **Mã hóa dữ liệu at-rest** — TDE (Transparent Data Encryption, AES) cho cột nhạy cảm: `BENHNHAN.CCCD`, `NHANVIEN.CMND` (NO SALT → giữ UNIQUE) + `BENHNHAN.DIUNGTHUOC`. Trong suốt với app; chạy `15_TDE_Encryption.sql`. *(`TIENSUBENH/TIENSUBENHGD` không mã hóa được do giới hạn kích thước NVARCHAR2 — `ORA-28331`.)*
+
+→ Chi tiết từng bước + kiểm chứng: **[docs/guides/SETUP_ENCRYPTION.md](docs/guides/SETUP_ENCRYPTION.md)**.
+
+> ⚠️ TDE: **giữ kỹ mật khẩu keystore + sao lưu thư mục wallet** — mất là không giải mã được dữ liệu.
+
 ---
 
 ## 9. Bảo mật & UTF-8 ở tầng ứng dụng
@@ -360,7 +378,10 @@ Tất cả kiểm soát truy cập do **Oracle DB Engine** thực thi (RBAC + VP
 | Tiếng Việt thành `???` / lỗi dấu trong DB | Chưa đặt `NLS_LANG=.AL32UTF8` trước khi chạy 01 → chạy lại sau khi set, hoặc chạy `12_Fix_UTF8_Data.sql` bằng BVADMIN |
 | Tiếng Việt thành `ThÃ´ng bÃ¡o` khi chạy file `.sql` bằng `sqlplus` trong **PowerShell** | Đã gõ `set NLS_LANG=...` (cú pháp CMD, vô tác dụng trong PowerShell) → sqlplus đọc UTF-8 sai. Dùng `$env:NLS_LANG = ".AL32UTF8"` rồi chạy lại trong cùng cửa sổ (xem §3) |
 | Đăng nhập u1–u8 OLS **không thấy thông báo nào** | `THONGBAO.OLS_LABEL` đang NULL (nhãn chưa gán) → chạy `PhanHe2/fix_ols_thongbao.sql` bằng CONNECT thật (xem §8 – Yêu cầu 2) |
+| DPV tạo bệnh nhân mới **nhưng tài khoản đăng nhập không tạo được** (báo `ORA-01031`) | BVADMIN thiếu quyền cấp `CREATE SESSION` cho tài khoản BN mới → chạy `PhanHe2/fix_benhnhan_account.sql` (cấp `CREATE SESSION ... WITH ADMIN OPTION` + viết lại `sp_create_benhnhan_full` an toàn, MABN tự sinh) |
 | `ORA-65066: must apply to all containers` khi `ALTER USER LBACSYS` | LBACSYS là common user → đổi từ **CDB root** (`@.../XE`) + `CONTAINER=ALL` (xem §4) |
+| `ORA-12660` khi app kết nối sau khi bật NNE | Server đặt `ENCRYPTION_SERVER=REQUIRED` nhưng client không thỏa → tạm hạ `REQUESTED` (xem SETUP_ENCRYPTION.md §1.3) |
+| `ORA-28365: wallet is not open` sau khi bật TDE | Keystore chưa mở (thường do restart DB mà chưa tạo auto-login) → tạo **auto-login keystore** hoặc mở tay `ADMINISTER KEY MANAGEMENT SET KEYSTORE OPEN ...` (SETUP_ENCRYPTION.md §2.4) |
 | `ORA-12154: could not resolve connect identifier` khi gõ tay trong PowerShell | Mật khẩu có ký tự `@` + PowerShell nuốt dấu `"` → sqlplus hiểu nhầm. Test bằng `sqlplus /nolog` rồi `CONNECT user/"pass@..."@host` bên trong; hoặc đổi mật khẩu không có `@` |
 | Tiếng Việt lỗi dấu trên giao diện | Dùng bản app mới (đã đổi `TO_CHAR`→`TO_NCHAR` + bind `NVarchar2`); rebuild lại |
 | File 05 lỗi `SA_*`/`LBACSYS` | OLS chưa được cài/mở khoá → xem §4 |

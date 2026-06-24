@@ -44,6 +44,11 @@ public class OLSViewerForm : Form
                 if (MessageBox.Show("Đăng xuất?", "Xác nhận",
                     MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                     Close();
+            },
+            (_, _) =>
+            {
+                using var dlg = new ChangePasswordDialog(_db);
+                if (dlg.ShowDialog(this) == DialogResult.OK) Close();  // đổi xong → đăng nhập lại
             });
         // ── Body: 4 hàng dọc, mỗi block nằm trong CELL riêng (không Dock chồng nhau) ──
         //   [0] info Card (nhãn OLS + tổng + ghi chú)   — Absolute, cao đủ 3 dòng

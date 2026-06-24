@@ -181,7 +181,7 @@ public class DPVForm : Form
             BackColor = UiTheme.Surface, ForeColor = UiTheme.TextDark,
             GlyphColor = UiTheme.Danger,
             BorderThickness = 1, BorderTint = UiTheme.BorderStrong,
-            Width = 152, Height = 38,
+            CornerRadius = 0, Width = 152, Height = 38,
             Anchor = AnchorStyles.Right | AnchorStyles.Top
         };
         btnLogout.Click += (_, _) =>
@@ -190,17 +190,33 @@ public class DPVForm : Form
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 Close();
         };
+        var btnChangePw = new RoundedButton
+        {
+            Text = "Đổi mật khẩu", Glyph = IconRegistry.Key,
+            BackColor = UiTheme.Surface, ForeColor = UiTheme.TextDark,
+            GlyphColor = UiTheme.Primary,
+            BorderThickness = 1, BorderTint = UiTheme.BorderStrong,
+            CornerRadius = 0, Width = 168, Height = 38,
+            Anchor = AnchorStyles.Right | AnchorStyles.Top
+        };
+        btnChangePw.Click += (_, _) =>
+        {
+            using var dlg = new ChangePasswordDialog(_db);
+            if (dlg.ShowDialog(this) == DialogResult.OK) Close();  // đổi xong → đăng nhập lại
+        };
         void layout()
         {
-            // Logout button luôn ở phải, chip nằm bên trái logout — không overlap
-            btnLogout.Location = new Point(header.Width - btnLogout.Width - 16, 12);
-            roleChip.Location  = new Point(btnLogout.Left - roleChip.Width - 12, 17);
+            // Logout ở phải; Đổi mật khẩu bên trái logout; chip bên trái nữa — không overlap
+            btnLogout.Location   = new Point(header.Width - btnLogout.Width - 16, 13);
+            btnChangePw.Location = new Point(btnLogout.Left - btnChangePw.Width - 8, 13);
+            roleChip.Location    = new Point(btnChangePw.Left - roleChip.Width - 12, 18);
             lblTitle.Width = Math.Max(140, roleChip.Left - lblTitle.Left - 16);
         }
         header.Resize += (_, _) => layout();
         // Chip width tính lại sau khi đo text
         roleChip.HandleCreated += (_, _) => layout();
         header.Controls.Add(roleChip);
+        header.Controls.Add(btnChangePw);
         header.Controls.Add(btnLogout);
         header.Controls.Add(lblTitle);
         // Viền hairline đáy header (thêm cuối → dock trước → trải hết bề ngang)
@@ -311,7 +327,8 @@ public class DPVForm : Form
         form.Controls.Add(titleBN, 0, r++);
 
         AddLabelRow(Lbl("Mã BN:"));
-        _txtMABN  = TB(200); AddInputRow(_txtMABN);
+        // MÃBN bất biến: chỉ hiển thị, không cho nhập/sửa (tự sinh khi tạo mới)
+        _txtMABN  = TB(200); _txtMABN.ReadOnly = true; AddInputRow(_txtMABN);
         AddLabelRow(Lbl("Họ tên:"));
         _txtTENBN = TB(260); AddInputRow(_txtTENBN);
 
@@ -412,8 +429,10 @@ public class DPVForm : Form
 
     private void ClearBNForm()
     {
-        _txtMABN.ReadOnly = false;
-        _txtMABN.Clear(); _txtTENBN.Clear(); _txtCCCD.Clear(); _txtDiaChi.Clear();
+        // MABN tự sinh khi lưu (SEQ_BENHNHAN) → khoá ô, không cho gõ tay
+        _txtMABN.ReadOnly = true;
+        _txtMABN.Text = "(tự sinh khi lưu)";
+        _txtTENBN.Clear(); _txtCCCD.Clear(); _txtDiaChi.Clear();
         _dtpNgaySinh.Value = DateTime.Today.AddYears(-30);
         _cmbPhai.SelectedIndex = 0;
     }
@@ -422,24 +441,27 @@ public class DPVForm : Form
     {
         TryCatch(() =>
         {
-            if (string.IsNullOrWhiteSpace(_txtMABN.Text) || string.IsNullOrWhiteSpace(_txtTENBN.Text))
-            { ShowError("Nhập đủ Mã BN và Họ tên."); return; }
-
             if (_isNewBN)
             {
-                // Validate CCCD ở app layer (chống dữ liệu xấu trước khi tới DB)
+                // MABN tự sinh trong proc → chỉ cần Họ tên + CCCD hợp lệ
+                if (string.IsNullOrWhiteSpace(_txtTENBN.Text))
+                { ShowError("Nhập họ tên bệnh nhân."); return; }
                 if (!System.Text.RegularExpressions.Regex.IsMatch(_txtCCCD.Text.Trim(), @"^\d{12}$"))
                 { ShowError("CCCD phải đúng 12 chữ số."); return; }
 
-                // Gọi procedure tạo BN + Oracle account (TC#1)
+                // Gọi procedure tạo BN + Oracle account (TC#1). p_mabn IN OUT = NULL → proc tự sinh & trả về.
                 using var conn = _db.OpenConnection();
                 using var cmd  = new OracleCommand("BVADMIN.sp_create_benhnhan_full", conn)
                 {
                     CommandType = System.Data.CommandType.StoredProcedure,
-                    BindByName  = true   // bind theo tên cho chắc đúng tham số
+                    BindByName  = true
                 };
-                // Dùng OracleHelper.Param → chuỗi bind NVarchar2 (tiếng Việt round-trip đúng)
-                cmd.Parameters.Add(OracleHelper.Param("p_mabn",      _txtMABN.Text.Trim()));
+                var pMabn = new OracleParameter("p_mabn", OracleDbType.Varchar2, 30)
+                {
+                    Direction = System.Data.ParameterDirection.InputOutput,
+                    Value     = DBNull.Value
+                };
+                cmd.Parameters.Add(pMabn);
                 cmd.Parameters.Add(OracleHelper.Param("p_tenbn",     _txtTENBN.Text.Trim()));
                 cmd.Parameters.Add(OracleHelper.Param("p_phai",      _cmbPhai.Text));
                 cmd.Parameters.Add(OracleHelper.Param("p_ngaysinh",  _dtpNgaySinh.Value));
@@ -450,15 +472,22 @@ public class DPVForm : Form
                 cmd.Parameters.Add(OracleHelper.Param("p_tinhtp",    _txtDiaChi.Text.Trim()));
                 cmd.ExecuteNonQuery();
 
-                AppAuditLogger.Info(_db.Username, "DPV.NewBN", $"mabn={_txtMABN.Text.Trim()}");
-                Toast.Show(this, $"Đã tạo BN {_txtMABN.Text.Trim()} + tài khoản BN_{_txtMABN.Text.Trim()}", Toast.Kind.Success);
-                MessageBox.Show($"Mật khẩu mặc định cho tài khoản BN_{_txtMABN.Text.Trim()}: BV@2025!\n\n" +
-                                "Vui lòng hướng dẫn bệnh nhân đổi mật khẩu khi đăng nhập lần đầu.",
-                                "Thông tin tài khoản", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                var newMabn = pMabn.Value?.ToString() ?? "";   // mã do proc sinh ra
+                AppAuditLogger.Info(_db.Username, "DPV.NewBN", $"mabn={newMabn}");
+                Toast.Show(this, $"Đã tạo bệnh nhân {newMabn} + tài khoản BN_{newMabn}", Toast.Kind.Success);
+                MessageBox.Show(
+                    $"Đã tạo bệnh nhân thành công.\n\n" +
+                    $"Mã bệnh nhân: {newMabn}\n" +
+                    $"Tài khoản đăng nhập: BN_{newMabn}\n" +
+                    $"Mật khẩu mặc định: BV@2025!\n\n" +
+                    "Hướng dẫn bệnh nhân đăng nhập; liên hệ DBA nếu cần đổi mật khẩu.",
+                    "Tạo bệnh nhân thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 _isNewBN = false;
             }
             else
             {
+                if (string.IsNullOrWhiteSpace(_txtMABN.Text) || string.IsNullOrWhiteSpace(_txtTENBN.Text))
+                { ShowError("Nhập đủ Mã BN và Họ tên."); return; }
                 _db.Execute(
                     "UPDATE BVADMIN.BENHNHAN SET TENBN=:t,PHAI=:p,NGAYSINH=:n,CCCD=:c,TINHTP=:tp WHERE MABN=:m",
                     OracleHelper.Param("t",  _txtTENBN.Text.Trim()),

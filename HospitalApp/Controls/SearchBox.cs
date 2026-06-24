@@ -25,11 +25,11 @@ public sealed class SearchBox : UserControl
 
         _icon = new Label
         {
-            Text = "🔍",
+            Text = IconRegistry.Search,           // icon monochrome (Segoe Fluent) thay emoji màu
             Dock = DockStyle.Left,
-            Width = 30,
+            Width = 32,
             TextAlign = ContentAlignment.MiddleCenter,
-            Font = UiTheme.Body(11f),
+            Font = IconRegistry.Icon(12f),
             ForeColor = UiTheme.TextMuted
         };
 
@@ -38,7 +38,11 @@ public sealed class SearchBox : UserControl
             BorderStyle = BorderStyle.None,
             Font = UiTheme.Body(10.5f),
             ForeColor = UiTheme.TextDark,
-            PlaceholderText = "Tìm kiếm..."
+            PlaceholderText = "Tìm kiếm...",
+            // Multiline=true để TỰ đặt được chiều cao > PreferredHeight → chữ có dấu
+            // tiếng Việt (ọ, ề, ỳ…) không bị viền trên/dưới cắt mất. 1 dòng, không xuống dòng.
+            Multiline = true,
+            WordWrap = false
         };
 
         _debounce = new System.Windows.Forms.Timer { Interval = 300 };
@@ -53,13 +57,13 @@ public sealed class SearchBox : UserControl
         Controls.Add(_txt);
         Controls.Add(_icon);
 
-        // FIX: TextBox 1 dòng KHÔNG tự giãn cao theo Dock=Fill → canh giữa theo chiều dọc THỦ CÔNG
-        // để chữ (dấu tiếng Việt) không bị viền trên/dưới cắt mất.
+        // Canh giữa dọc THỦ CÔNG + chừa thêm chỗ cho dấu tiếng Việt (trên & dưới) → không bị cắt.
         void LayoutTxt()
         {
-            int left = _icon.Right + 2;
-            int top = Math.Max(0, (ClientSize.Height - _txt.PreferredHeight) / 2);
-            _txt.SetBounds(left, top, Math.Max(10, ClientSize.Width - left - 6), _txt.PreferredHeight);
+            int left  = _icon.Right + 2;
+            int boxH  = _txt.Font.Height + 6;     // cao hơn line-height một chút cho dấu
+            int top   = Math.Max(0, (ClientSize.Height - boxH) / 2);
+            _txt.SetBounds(left, top, Math.Max(10, ClientSize.Width - left - 6), boxH);
         }
         Resize += (_, _) => LayoutTxt();
         HandleCreated += (_, _) => LayoutTxt();

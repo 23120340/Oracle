@@ -43,6 +43,20 @@ CREATE TABLE BENHNHAN (
     ORACLE_USER  VARCHAR2(100)   UNIQUE  -- ánh xạ 1-1 với Oracle account
 );
 
+-- MÃBN BẤT BIẾN: là khoá chính + cơ sở tên tài khoản BN_<MABN> (TC#1) + bị HSBA tham chiếu (FK).
+-- Chặn MỌI lệnh UPDATE đổi MABN (app lẫn SQL trực tiếp). Chỉ chặn khi MABN thực sự đổi → các
+-- UPDATE thường (sửa địa chỉ, tiền sử…) không bị ảnh hưởng. INSERT (tạo BN mới) KHÔNG bị chặn.
+CREATE OR REPLACE TRIGGER trg_benhnhan_mabn_immutable
+BEFORE UPDATE OF MABN ON BENHNHAN
+FOR EACH ROW
+WHEN (NEW.MABN != OLD.MABN)
+BEGIN
+    RAISE_APPLICATION_ERROR(-20010,
+        'MÃBN là định danh bất biến, không được phép sửa (cũ=' || :OLD.MABN ||
+        ', mới=' || :NEW.MABN || ').');
+END;
+/
+
 -- NHÂNVIÊN: tất cả nhân viên bệnh viện
 -- ORACLE_USER: ánh xạ 1-1 với Oracle account (TC#1)
 CREATE TABLE NHANVIEN (

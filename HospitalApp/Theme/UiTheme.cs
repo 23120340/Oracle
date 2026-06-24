@@ -328,7 +328,8 @@ public static class UiTheme
     // MINIMALISM header: nền trắng, tiêu đề canh TRÁI (TextDark), nút Đăng xuất kiểu ghost,
     // viền hairline dưới đáy. Tham số bg/btnDark giữ để tương thích chữ ký (không tô màu nền nữa).
     public static Panel Header(string title, Color bg, Color btnDark,
-                               EventHandler? onLogout = null)
+                               EventHandler? onLogout = null,
+                               EventHandler? onChangePassword = null)
     {
         var p = new Panel { Dock = DockStyle.Top, Height = 64, BackColor = Surface };
         p.Paint += (_, e) =>
@@ -344,32 +345,43 @@ public static class UiTheme
             Font = Heading1(16f),
             TextAlign = ContentAlignment.MiddleLeft,
             AutoEllipsis = true,
-            Padding = new Padding(24, 0, onLogout == null ? 24 : 150, 0)
+            Padding = new Padding(24, 0, 8, 0)
         };
-        Button? btn = null;
-        if (onLogout != null)
+        if (onLogout != null || onChangePassword != null)
         {
-            btn = new Button
+            // Cụm nút phải, xếp từ phải sang trái: Đăng xuất ngoài cùng, Đổi mật khẩu bên trái.
+            var right = new FlowLayoutPanel
             {
-                Text = "Đăng xuất",
-                Dock = DockStyle.Right, Width = 130,
-                BackColor = Surface, ForeColor = TextMuted,
-                FlatStyle = FlatStyle.Flat,
-                Font = Button(), Cursor = Cursors.Hand,
-                Margin = new Padding(0, 14, 16, 14)
+                Dock = DockStyle.Right, AutoSize = true,
+                FlowDirection = FlowDirection.RightToLeft, WrapContents = false,
+                BackColor = Surface, Padding = new Padding(8, 13, 16, 13)
             };
-            btn.FlatAppearance.BorderSize = 1;
-            btn.FlatAppearance.BorderColor = BorderStrong;
-            btn.FlatAppearance.MouseOverBackColor = BgLight;
-            btn.Click += onLogout;
-            // chừa lề phải bằng panel bọc để nút không dính sát mép + canh giữa dọc
-            var wrap = new Panel { Dock = DockStyle.Right, Width = 150, BackColor = Surface,
-                                   Padding = new Padding(8, 14, 16, 14) };
-            btn.Dock = DockStyle.Fill;
-            wrap.Controls.Add(btn);
-            p.Controls.Add(wrap);
+            if (onLogout != null)
+                right.Controls.Add(GhostHeaderButton("Đăng xuất", onLogout));
+            if (onChangePassword != null)
+                right.Controls.Add(GhostHeaderButton("Đổi mật khẩu", onChangePassword));
+            p.Controls.Add(right);
         }
         p.Controls.Add(titleLabel);
         return p;
+    }
+
+    // Nút "khối vuông" kiểu ghost cho header dùng chung (nền trắng, viền mảnh, góc vuông).
+    private static Button GhostHeaderButton(string text, EventHandler onClick)
+    {
+        var b = new Button
+        {
+            Text = text, Height = 38, MinimumSize = new Size(130, 38),
+            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Padding = new Padding(14, 0, 14, 0), Margin = new Padding(8, 0, 0, 0),
+            BackColor = Surface, ForeColor = TextDark,
+            FlatStyle = FlatStyle.Flat, Font = Button(), Cursor = Cursors.Hand,
+            TextAlign = ContentAlignment.MiddleCenter
+        };
+        b.FlatAppearance.BorderSize = 1;
+        b.FlatAppearance.BorderColor = BorderStrong;
+        b.FlatAppearance.MouseOverBackColor = BgLight;
+        b.Click += onClick;
+        return b;
     }
 }
