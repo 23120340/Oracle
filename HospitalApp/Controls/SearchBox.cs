@@ -18,16 +18,16 @@ public sealed class SearchBox : UserControl
 
     public SearchBox()
     {
-        Width = 300; Height = 38;   // FIX: cao hơn để chữ (dấu tiếng Việt) không bị cắt đáy
+        Width = 300; Height = 40;
         BackColor = Color.White;
-        Padding = new Padding(8, 2, 8, 2);
+        Padding = new Padding(8, 0, 8, 0);
         BorderStyle = BorderStyle.FixedSingle;
 
         _icon = new Label
         {
             Text = "🔍",
             Dock = DockStyle.Left,
-            Width = 24,
+            Width = 30,
             TextAlign = ContentAlignment.MiddleCenter,
             Font = UiTheme.Body(11f),
             ForeColor = UiTheme.TextMuted
@@ -35,9 +35,8 @@ public sealed class SearchBox : UserControl
 
         _txt = new TextBox
         {
-            Dock = DockStyle.Fill,
             BorderStyle = BorderStyle.None,
-            Font = UiTheme.Body(10f),
+            Font = UiTheme.Body(10.5f),
             ForeColor = UiTheme.TextDark,
             PlaceholderText = "Tìm kiếm..."
         };
@@ -53,6 +52,18 @@ public sealed class SearchBox : UserControl
 
         Controls.Add(_txt);
         Controls.Add(_icon);
+
+        // FIX: TextBox 1 dòng KHÔNG tự giãn cao theo Dock=Fill → canh giữa theo chiều dọc THỦ CÔNG
+        // để chữ (dấu tiếng Việt) không bị viền trên/dưới cắt mất.
+        void LayoutTxt()
+        {
+            int left = _icon.Right + 2;
+            int top = Math.Max(0, (ClientSize.Height - _txt.PreferredHeight) / 2);
+            _txt.SetBounds(left, top, Math.Max(10, ClientSize.Width - left - 6), _txt.PreferredHeight);
+        }
+        Resize += (_, _) => LayoutTxt();
+        HandleCreated += (_, _) => LayoutTxt();
+        LayoutTxt();
     }
 
     public new string Text

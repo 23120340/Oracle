@@ -8,12 +8,12 @@ namespace HospitalApp.Controls;
 // ═══════════════════════════════════════════════════════════════════════════════
 public class Card : Panel
 {
-    public int  CornerRadius { get; set; } = UiTheme.RadiusLg;
-    public int  ShadowDepth  { get; set; } = 6;
+    public int  CornerRadius { get; set; } = UiTheme.RadiusMd;   // 10 — bo nhẹ, minimalist
+    public int  ShadowDepth  { get; set; } = 3;                  // shadow rất nhẹ (ưu tiên viền hairline)
     public Color FillColor   { get; set; } = UiTheme.Surface;
     public Color BorderColor { get; set; } = UiTheme.Border;
     public int  BorderWidth  { get; set; } = 1;
-    public bool ShowShadow   { get; set; } = true;
+    public bool ShowShadow   { get; set; } = false;             // mặc định phẳng; bật khi cần nổi khối
 
     public Card()
     {
@@ -76,6 +76,8 @@ public class RoundedButton : Button
     public string Glyph        { get; set; } = "";
     public Color  GlyphColor   { get; set; } = Color.White;
     public Color  HoverColor   { get; set; } = Color.Empty;
+    public int    BorderThickness { get; set; } = 0;            // 0 = không viền
+    public Color  BorderTint      { get; set; } = UiTheme.Border;
 
     private bool _hover;
 
@@ -126,6 +128,19 @@ public class RoundedButton : Button
         if (!Enabled) bg = Color.FromArgb(120, bg);
 
         using (var fill = new SolidBrush(bg)) g.FillPath(fill, path);
+
+        // Viền sạch (AA), vẽ lùi vào trong để không bị Region cắt mất → mép gọn
+        if (BorderThickness > 0)
+        {
+            var ins = BorderThickness;
+            var br = new Rectangle(ins, ins, Width - 1 - ins * 2, Height - 1 - ins * 2);
+            if (br.Width > 0 && br.Height > 0)
+            {
+                using var bpen = new Pen(BorderTint, BorderThickness);
+                using var bpath = Card.RoundedRect(br, Math.Max(1, CornerRadius - ins));
+                g.DrawPath(bpen, bpath);
+            }
+        }
 
         // Draw glyph + text
         var contentRect = ClientRectangle;

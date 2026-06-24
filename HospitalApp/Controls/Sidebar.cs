@@ -29,10 +29,13 @@ public class Sidebar : Panel
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
             AutoScroll = true,
-            Padding = new Padding(8, 16, 8, 16),
+            Padding = new Padding(12, 18, 12, 16),
             BackColor = UiTheme.SidebarBg
         };
         Controls.Add(_items);
+        // Viền hairline bên phải tách sidebar trắng khỏi vùng nội dung (minimalism)
+        var rightBorder = new Panel { Dock = DockStyle.Right, Width = 1, BackColor = UiTheme.Border };
+        Controls.Add(rightBorder);
     }
 
     public void AddBrand(string title, string subtitle = "")
@@ -78,12 +81,11 @@ public class Sidebar : Panel
     {
         var l = new Label
         {
-            Text = label.ToUpper(),
-            Width = Width - 16, Height = 24,
-            Font = UiTheme.LabelBold(8f),
+            Text = label,                       // dạng câu, KHÔNG viết HOA toàn bộ
+            AutoSize = true,                    // FIX: tự cao theo chữ → KHÔNG cắt dấu tiếng Việt ở trên
+            Font = UiTheme.LabelBold(8.5f),
             ForeColor = UiTheme.SidebarTextDim,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Padding = new Padding(12, 8, 4, 0)
+            Margin = new Padding(12, 14, 4, 4)
         };
         _items.Controls.Add(l);
     }
@@ -117,9 +119,9 @@ public class Sidebar : Panel
 
     private static Panel MakeSeparator() => new()
     {
-        Width = 220, Height = 1,
-        BackColor = Color.FromArgb(66, 86, 116),
-        Margin = new Padding(0, 6, 0, 10)
+        Width = 200, Height = 1,
+        BackColor = UiTheme.Border,
+        Margin = new Padding(8, 6, 8, 10)
     };
 }
 
@@ -177,7 +179,7 @@ public class SidebarItem : Control
         }
         else if (_hover)
         {
-            using var b = new SolidBrush(Color.FromArgb(20, 255, 255, 255));
+            using var b = new SolidBrush(UiTheme.SidebarBgAlt);
             g.FillPath(b, path);
         }
 

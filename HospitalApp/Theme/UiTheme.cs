@@ -17,49 +17,53 @@ public static class UiTheme
     // ═══════════════════════════════════════════════════════════════════════════
     // PALETTE
     // ═══════════════════════════════════════════════════════════════════════════
-    public static readonly Color Primary      = Color.FromArgb( 30,  90, 160);
-    public static readonly Color PrimaryDark  = Color.FromArgb( 20,  60, 110);
-    public static readonly Color Accent       = Color.FromArgb(  0, 140, 100);
-    public static readonly Color Warning      = Color.FromArgb(220, 140,   0);
-    public static readonly Color Danger       = Color.FromArgb(200,  50,  50);
-    public static readonly Color BgLight      = Color.FromArgb(248, 250, 253);
-    public static readonly Color Surface      = Color.White;
-    public static readonly Color TextDark     = Color.FromArgb( 30,  35,  45);
-    public static readonly Color TextMuted    = Color.FromArgb(120, 125, 135);
-    public static readonly Color Border       = Color.FromArgb(220, 225, 230);
+    // ─── MINIMALISM (Swiss style): neutral nền + DUY NHẤT 1 màu nhấn teal ───
+    public static readonly Color Primary      = Color.FromArgb( 15, 118, 110);   // #0F766E teal-700 (accent chính)
+    public static readonly Color PrimaryDark  = Color.FromArgb( 17,  94,  89);   // #115E59 teal-800 (hover)
+    public static readonly Color Accent       = Color.FromArgb( 15, 118, 110);   // #0F766E
+    public static readonly Color Warning      = Color.FromArgb(180,  83,   9);   // #B45309 amber-700
+    public static readonly Color Danger       = Color.FromArgb(180,  35,  24);   // #B42318 red-700
+    public static readonly Color BgLight      = Color.FromArgb(245, 246, 248);   // #F5F6F8 app background
+    public static readonly Color Surface      = Color.White;                     // #FFFFFF cards/header
+    public static readonly Color TextDark     = Color.FromArgb( 26,  29,  33);   // #1A1D21 primary text
+    public static readonly Color TextMuted    = Color.FromArgb( 91, 100, 112);   // #5B6470 secondary text
+    public static readonly Color TextFaint    = Color.FromArgb(154, 161, 172);   // #9AA1AC caption/placeholder
+    public static readonly Color Border       = Color.FromArgb(232, 234, 237);   // #E8EAED hairline
+    public static readonly Color BorderStrong = Color.FromArgb(215, 219, 224);   // #D7DBE0 input border
+    public static readonly Color AccentTint   = Color.FromArgb(230, 244, 242);   // #E6F4F2 selected/active bg
 
-    // Màu phụ trợ theo vai trò (chỉ dùng cho header / role chip)
-    public static readonly Color RoleAdmin    = Color.FromArgb( 30,  90, 160);
-    public static readonly Color RoleAdminDk  = Color.FromArgb( 20,  60, 110);
-    public static readonly Color RoleDPV      = Color.FromArgb(180, 100,   0);
-    public static readonly Color RoleDPVDk    = Color.FromArgb(150,  75,   0);
-    public static readonly Color RoleBS       = Color.FromArgb(  0, 120,  80);
-    public static readonly Color RoleBSDk     = Color.FromArgb(  0,  90,  60);
-    public static readonly Color RoleKTV      = Color.FromArgb(  0, 140,  60);
-    public static readonly Color RoleKTVDk    = Color.FromArgb(  0, 100,  40);
-    public static readonly Color RoleBN       = Color.FromArgb(140,  60, 140);
-    public static readonly Color RoleBNDk     = Color.FromArgb(100,  40, 100);
+    // Màu phụ trợ theo vai trò — chỉ dùng cho CHIP nhỏ trên header (điểm nhấn nhẹ, muted)
+    public static readonly Color RoleAdmin    = Color.FromArgb( 15, 118, 110);   // teal
+    public static readonly Color RoleAdminDk  = Color.FromArgb( 17,  94,  89);
+    public static readonly Color RoleDPV      = Color.FromArgb(180,  83,   9);   // amber-700
+    public static readonly Color RoleDPVDk    = Color.FromArgb(146,  64,  14);
+    public static readonly Color RoleBS       = Color.FromArgb( 21, 128,  61);   // green-700
+    public static readonly Color RoleBSDk     = Color.FromArgb( 22,  101,  52);
+    public static readonly Color RoleKTV      = Color.FromArgb( 14, 116, 144);   // cyan-700
+    public static readonly Color RoleKTVDk    = Color.FromArgb( 21,  94, 117);
+    public static readonly Color RoleBN       = Color.FromArgb(109,  40, 217);   // violet-700
+    public static readonly Color RoleBNDk     = Color.FromArgb( 91,  33, 182);
 
-    // Healthcare palette từ ui-ux-pro-max recommendations
-    public static readonly Color HealthCyan      = Color.FromArgb(  8, 145, 178);   // #0891B2
-    public static readonly Color HealthCyanLight = Color.FromArgb( 34, 211, 238);   // #22D3EE
-    public static readonly Color HealthGreen     = Color.FromArgb(  5, 150, 105);   // #059669
-    public static readonly Color HealthEmerald   = Color.FromArgb( 22, 163,  74);   // #16A34A
-    public static readonly Color HealthBgTint    = Color.FromArgb(236, 254, 255);   // #ECFEFF
-    public static readonly Color HealthBgMint    = Color.FromArgb(236, 253, 245);   // #ECFDF5
+    // Button accents (semantic) — đã hoà vào palette minimalist
+    public static readonly Color HealthCyan      = Color.FromArgb( 15, 118, 110);   // teal = hành động chính
+    public static readonly Color HealthCyanLight = Color.FromArgb( 20, 184, 166);   // #14B8A6 teal-500 (nhấn nav)
+    public static readonly Color HealthGreen     = Color.FromArgb( 21, 128,  61);   // #15803D green-700 = lưu
+    public static readonly Color HealthEmerald   = Color.FromArgb( 21, 128,  61);   // #15803D
+    public static readonly Color HealthBgTint    = Color.FromArgb(230, 244, 242);   // teal tint
+    public static readonly Color HealthBgMint    = Color.FromArgb(236, 253, 243);   // green tint
 
     // Status semantic
-    public static readonly Color StatusSuccess   = Color.FromArgb(  5, 150, 105);
-    public static readonly Color StatusWarning   = Color.FromArgb(217, 119,   6);
-    public static readonly Color StatusInfo      = Color.FromArgb(  8, 145, 178);
-    public static readonly Color StatusDanger    = Color.FromArgb(220,  38,  38);
+    public static readonly Color StatusSuccess   = Color.FromArgb( 21, 128,  61);
+    public static readonly Color StatusWarning   = Color.FromArgb(180,  83,   9);
+    public static readonly Color StatusInfo      = Color.FromArgb( 15, 118, 110);
+    public static readonly Color StatusDanger    = Color.FromArgb(180,  35,  24);
 
-    // Sidebar palette
-    public static readonly Color SidebarBg       = Color.FromArgb( 22,  30,  46);
-    public static readonly Color SidebarBgAlt    = Color.FromArgb( 30,  39,  58);
-    public static readonly Color SidebarText     = Color.FromArgb(180, 190, 210);
-    public static readonly Color SidebarTextDim  = Color.FromArgb(130, 138, 160);
-    public static readonly Color SidebarActive   = Color.FromArgb(255, 255, 255);
+    // Sidebar palette — MINIMALISM: nav SÁNG (trắng) thay vì tối
+    public static readonly Color SidebarBg       = Color.White;                  // #FFFFFF
+    public static readonly Color SidebarBgAlt    = Color.FromArgb(245, 246, 248);// #F5F6F8 hover
+    public static readonly Color SidebarText     = Color.FromArgb( 91, 100, 112);// #5B6470 mục thường
+    public static readonly Color SidebarTextDim  = Color.FromArgb(154, 161, 172);// #9AA1AC nhãn section
+    public static readonly Color SidebarActive   = Color.FromArgb( 26,  29,  33);// #1A1D21 mục active
 
     // Spacing scale (4/8dp rhythm)
     public const int Spacing1 = 4;
@@ -142,20 +146,23 @@ public static class UiTheme
     // ═══════════════════════════════════════════════════════════════════════════
     // FONT HELPERS  (single source of truth — KHÔNG hard-code "Segoe UI" nơi khác)
     // ═══════════════════════════════════════════════════════════════════════════
-    public static Font Body(float size = 9.5f, FontStyle style = FontStyle.Regular)
+    // ─── TYPE SCALE (Montserrat) — phân cấp rõ ràng, đọc tốt trên desktop ───
+    //  H1 page title 16 · H2 section 13 · H3 card 11 · Body 10 · Label 9.5 · Caption 8.5
+    public static Font Body(float size = 10f, FontStyle style = FontStyle.Regular)
         => new(Family, size, style, GraphicsUnit.Point);
 
-    public static Font BodyBold(float size = 9.5f) => Body(size, FontStyle.Bold);
+    public static Font BodyBold(float size = 10f) => Body(size, FontStyle.Bold);
 
-    public static Font Label(float size = 9f)     => Body(size, FontStyle.Regular);
-    public static Font LabelBold(float size = 9f) => Body(size, FontStyle.Bold);
+    public static Font Label(float size = 9.5f)     => Body(size, FontStyle.Regular);
+    public static Font LabelBold(float size = 9.5f) => Body(size, FontStyle.Bold);
 
-    public static Font Heading1(float size = 18f) => Body(size, FontStyle.Bold);
-    public static Font Heading2(float size = 14f) => Body(size, FontStyle.Bold);
+    public static Font Heading1(float size = 16f) => Body(size, FontStyle.Bold);
+    public static Font Heading2(float size = 13f) => Body(size, FontStyle.Bold);
     public static Font Heading3(float size = 11f) => Body(size, FontStyle.Bold);
 
-    public static Font Button(float size = 9.5f) => Body(size, FontStyle.Bold);
-    public static Font Italic(float size = 9f)   => Body(size, FontStyle.Italic);
+    public static Font Caption(float size = 8.5f) => Body(size, FontStyle.Regular);
+    public static Font Button(float size = 10f)   => Body(size, FontStyle.Bold);
+    public static Font Italic(float size = 9f)    => Body(size, FontStyle.Italic);
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CONTROL FACTORIES — đảm bảo style nhất quán
@@ -196,18 +203,40 @@ public static class UiTheme
         return b;
     }
 
-    public static TextBox TextField(int width = 220) => new()
+    public static TextBox TextField(int width = 220) => Pad(new()
     {
-        Width = width, Height = 30,
+        Width = width, Height = 36,
         Font = Body(),
         BorderStyle = BorderStyle.FixedSingle
-    };
+    });
+
+    // ─── Text inset cho TextBox (EM_SETMARGINS) — chữ KHÔNG dính sát viền trái/phải ───
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+    private const int EM_SETMARGINS  = 0x00D3;
+    private const int EC_LEFTMARGIN  = 0x0001;
+    private const int EC_RIGHTMARGIN = 0x0002;
+
+    /// <summary>Thêm lề trong (px) cho TextBox để chữ thoáng, không bị viền che.</summary>
+    public static TextBox Pad(TextBox tb, int left = 9, int right = 9)
+    {
+        void Apply()
+        {
+            if (!tb.IsHandleCreated) return;
+            int lp = (right << 16) | (left & 0xFFFF);
+            SendMessage(tb.Handle, EM_SETMARGINS,
+                        (IntPtr)(EC_LEFTMARGIN | EC_RIGHTMARGIN), (IntPtr)lp);
+        }
+        tb.HandleCreated += (_, _) => Apply();
+        Apply();
+        return tb;
+    }
 
     public static Label FieldLabel(string text) => new()
     {
         Text = text, AutoSize = true,
         Font = Label(),
-        ForeColor = TextDark,
+        ForeColor = TextMuted,
         Padding = new Padding(0, 6, 6, 0)
     };
 
@@ -215,79 +244,132 @@ public static class UiTheme
     {
         Text = text, AutoSize = true,
         Font = Heading3(),
-        ForeColor = Primary,
+        ForeColor = TextDark,
         Padding = new Padding(0, 8, 0, 6)
     };
 
-    public static DataGridView Grid() => new()
+    // MINIMALISM grid: nền trắng, KHÔNG kẻ dọc, hàng cách nhau bằng đường hairline,
+    // header trắng chữ muted, hàng chọn nền teal nhạt. Tự đổi tên cột HOA → dạng câu.
+    public static DataGridView Grid()
     {
-        ReadOnly = true, AllowUserToAddRows = false,
-        AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-        SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-        BackgroundColor = Surface,
-        RowHeadersVisible = false,
-        Font = Body(),
-        EnableHeadersVisualStyles = false,
-        BorderStyle = BorderStyle.None,
-        CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
-        ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single,
-        ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
-        ColumnHeadersHeight = 34,
-        ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+        var g = new DataGridView
         {
-            BackColor = Color.FromArgb(241, 245, 249),
-            ForeColor = TextDark,
-            Font      = BodyBold(),
-            Padding   = new Padding(8, 6, 8, 6),
-            Alignment = DataGridViewContentAlignment.MiddleLeft
-        },
-        DefaultCellStyle = new DataGridViewCellStyle
+            ReadOnly = true, AllowUserToAddRows = false,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            BackgroundColor = Surface,
+            RowHeadersVisible = false,
+            Font = Body(),
+            EnableHeadersVisualStyles = false,
+            BorderStyle = BorderStyle.None,
+            CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+            ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
+            ColumnHeadersHeight = 40,
+            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+            {
+                BackColor = Surface,
+                ForeColor = TextMuted,
+                Font      = LabelBold(9f),
+                Padding   = new Padding(10, 8, 10, 8),
+                Alignment = DataGridViewContentAlignment.MiddleLeft
+            },
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Font            = Body(),
+                ForeColor       = TextDark,
+                BackColor       = Surface,
+                SelectionBackColor = AccentTint,
+                SelectionForeColor = TextDark,
+                Padding         = new Padding(10, 6, 10, 6)
+            },
+            AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle { BackColor = Surface },
+            GridColor = Border,
+            RowTemplate = { Height = 40 }
+        };
+        // Đổi tên cột kỹ thuật (HOA) sang nhãn dạng câu, dễ đọc — áp dụng cho mọi lưới.
+        g.DataBindingComplete += (_, _) =>
         {
-            Font            = Body(),
-            ForeColor       = TextDark,
-            SelectionBackColor = Color.FromArgb(220, 235, 250),
-            SelectionForeColor = TextDark,
-            Padding         = new Padding(8, 4, 8, 4)
-        },
-        AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle
-        {
-            BackColor = Color.FromArgb(250, 252, 255)
-        },
-        GridColor = Border,
-        RowTemplate = { Height = 32 }
+            foreach (DataGridViewColumn c in g.Columns)
+                c.HeaderText = FriendlyHeader(c.Name);
+        };
+        return g;
+    }
+
+    private static readonly Dictionary<string, string> _headerMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["MAHSBA"]="Mã HSBA", ["MABN"]="Mã BN", ["MABS"]="Bác sĩ", ["MAKTV"]="KTV",
+        ["MANV"]="Mã NV", ["MATB"]="Mã TB", ["NGAY"]="Ngày", ["NGAYSINH"]="Ngày sinh",
+        ["NGAYGIO"]="Ngày giờ", ["NGAYDV"]="Ngày DV", ["TENBN"]="Họ tên", ["HOTEN"]="Họ tên",
+        ["PHAI"]="Phái", ["CCCD"]="CCCD", ["TINHTP"]="Tỉnh/TP", ["MAKHOA"]="Khoa",
+        ["TRANGTHAI"]="Trạng thái", ["NOIDUNG"]="Nội dung", ["DIADIEM"]="Địa điểm",
+        ["LOAIDV"]="Loại dịch vụ", ["KETQUA"]="Kết quả", ["CHANDOAN"]="Chẩn đoán",
+        ["KETLUAN"]="Kết luận", ["DIEUTRI"]="Điều trị", ["VAITRO"]="Vai trò",
+        ["TENTHUOC"]="Tên thuốc", ["LIEUDUNG"]="Liều dùng", ["USERNAME"]="Tài khoản",
+        ["ROLE"]="Vai trò", ["PRIVILEGE"]="Quyền", ["OBJECT"]="Đối tượng",
+        ["GRANTABLE"]="Cấp lại được", ["COLUMNS"]="Cột", ["TYPE"]="Loại",
+        ["ACTION"]="Hành động", ["RESULT"]="Kết quả", ["TIME"]="Thời gian",
+        ["OWNER"]="Schema", ["TABLE_NAME"]="Bảng", ["COLUMN_NAME"]="Cột",
+        ["GRANTOR"]="Người cấp", ["GRANTED_ROLE"]="Vai trò", ["DEFAULT_ROLE"]="Mặc định",
+        ["ADMIN_OPTION"]="Quyền cấp lại", ["AUTHENTICATION_TYPE"]="Kiểu xác thực",
+        ["COMMON"]="Common", ["ACCOUNT_STATUS"]="Trạng thái", ["DEFAULT_TABLESPACE"]="Tablespace",
+        ["CREATED"]="Ngày tạo", ["EXPIRY_DATE"]="Ngày hết hạn",
     };
 
+    /// <summary>Đổi tên cột HOA (vd "ACCOUNT_STATUS") sang dạng câu dễ đọc.</summary>
+    public static string FriendlyHeader(string raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return raw;
+        if (_headerMap.TryGetValue(raw, out var v)) return v;
+        var s = raw.Replace('_', ' ').Trim().ToLowerInvariant();
+        return s.Length == 0 ? raw : char.ToUpperInvariant(s[0]) + s[1..];
+    }
+
+    // MINIMALISM header: nền trắng, tiêu đề canh TRÁI (TextDark), nút Đăng xuất kiểu ghost,
+    // viền hairline dưới đáy. Tham số bg/btnDark giữ để tương thích chữ ký (không tô màu nền nữa).
     public static Panel Header(string title, Color bg, Color btnDark,
                                EventHandler? onLogout = null)
     {
-        var p = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = bg };
+        var p = new Panel { Dock = DockStyle.Top, Height = 64, BackColor = Surface };
+        p.Paint += (_, e) =>
+        {
+            using var pen = new Pen(Border, 1);
+            e.Graphics.DrawLine(pen, 0, p.Height - 1, p.Width, p.Height - 1);
+        };
         var titleLabel = new Label
         {
             Text = title,
             Dock = DockStyle.Fill,
-            ForeColor = Color.White,
-            Font = Heading2(),
-            TextAlign = ContentAlignment.MiddleCenter,
+            ForeColor = TextDark,
+            Font = Heading1(16f),
+            TextAlign = ContentAlignment.MiddleLeft,
             AutoEllipsis = true,
-            Padding = new Padding(12, 0, onLogout == null ? 12 : 152, 0)
+            Padding = new Padding(24, 0, onLogout == null ? 24 : 150, 0)
         };
         Button? btn = null;
         if (onLogout != null)
         {
             btn = new Button
             {
-                Text = "Đăng xuất",   // FIX UI: bỏ ký hiệu ⏻ (U+23FB) — Montserrat không có glyph này → tofu
-                Dock = DockStyle.Right, Width = 140,
-                BackColor = btnDark, ForeColor = Color.White,
+                Text = "Đăng xuất",
+                Dock = DockStyle.Right, Width = 130,
+                BackColor = Surface, ForeColor = TextMuted,
                 FlatStyle = FlatStyle.Flat,
-                Font = Button(), Cursor = Cursors.Hand
+                Font = Button(), Cursor = Cursors.Hand,
+                Margin = new Padding(0, 14, 16, 14)
             };
-            btn.FlatAppearance.BorderSize = 0;
+            btn.FlatAppearance.BorderSize = 1;
+            btn.FlatAppearance.BorderColor = BorderStrong;
+            btn.FlatAppearance.MouseOverBackColor = BgLight;
             btn.Click += onLogout;
-            p.Controls.Add(btn);
+            // chừa lề phải bằng panel bọc để nút không dính sát mép + canh giữa dọc
+            var wrap = new Panel { Dock = DockStyle.Right, Width = 150, BackColor = Surface,
+                                   Padding = new Padding(8, 14, 16, 14) };
+            btn.Dock = DockStyle.Fill;
+            wrap.Controls.Add(btn);
+            p.Controls.Add(wrap);
         }
         p.Controls.Add(titleLabel);
-        btn?.BringToFront();
         return p;
     }
 }

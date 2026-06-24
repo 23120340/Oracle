@@ -88,14 +88,14 @@ public class KTVForm : Form
     {
         var header = new Panel
         {
-            Dock = DockStyle.Top, Height = 60,
+            Dock = DockStyle.Top, Height = 64,
             BackColor = UiTheme.Surface,
             Padding = new Padding(24, 12, 24, 12)
         };
         var lblTitle = new Label
         {
-            Text = title, Dock = DockStyle.Left, Width = 300,
-            Font = UiTheme.Heading2(), ForeColor = UiTheme.TextDark,
+            Text = title, Dock = DockStyle.Left, Width = 320,
+            Font = UiTheme.Heading1(16f), ForeColor = UiTheme.TextDark,
             TextAlign = ContentAlignment.MiddleLeft,
             AutoEllipsis = true
         };
@@ -107,9 +107,10 @@ public class KTVForm : Form
         var btnLogout = new RoundedButton
         {
             Text = "Đăng xuất", Glyph = IconRegistry.SignOut,
-            BackColor = UiTheme.BgLight, ForeColor = UiTheme.TextDark,
+            BackColor = UiTheme.Surface, ForeColor = UiTheme.TextDark,
             GlyphColor = UiTheme.Danger,
-            Width = 130, Height = 36,
+            BorderThickness = 1, BorderTint = UiTheme.BorderStrong,
+            Width = 152, Height = 38,
             Anchor = AnchorStyles.Right | AnchorStyles.Top
         };
         btnLogout.Click += (_, _) =>
@@ -129,6 +130,7 @@ public class KTVForm : Form
         header.Controls.Add(roleChip);
         header.Controls.Add(btnLogout);
         header.Controls.Add(lblTitle);
+        header.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = UiTheme.Border });
         layout();
         return header;
     }
@@ -149,7 +151,7 @@ public class KTVForm : Form
             Height = 28,
             Padding = new Padding(8, 6, 0, 0),
             Font = UiTheme.LabelBold(),
-            ForeColor = Color.FromArgb(0, 90, 40),
+            ForeColor = UiTheme.TextMuted,
             Text = "Nhãn OLS: (chưa tải)"
         };
         var dgv = UiTheme.Grid();
@@ -208,7 +210,7 @@ public class KTVForm : Form
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false,
             AutoScroll = true,
-            BackColor = Color.FromArgb(235, 250, 235)
+            BackColor = UiTheme.BgLight
         };
         _btnRefresh = new Button
         {
@@ -239,7 +241,7 @@ public class KTVForm : Form
         var bottom = new Panel
         {
             Dock = DockStyle.Bottom, Height = 140,
-            BackColor = Color.FromArgb(245, 252, 245),
+            BackColor = UiTheme.BgLight,
             Padding = new Padding(10)
         };
         var bottomLayout = new TableLayoutPanel
@@ -272,7 +274,7 @@ public class KTVForm : Form
         _btnSave = new Button
         {
             Dock = DockStyle.Fill, Text = "Lưu kết quả",
-            BackColor = Color.FromArgb(0, 140, 60),
+            BackColor = UiTheme.HealthGreen,
             ForeColor = Color.White, FlatStyle = FlatStyle.Flat,
             Font = UiTheme.Button(10f), Cursor = Cursors.Hand,
             Padding = new Padding(8, 0, 8, 0),

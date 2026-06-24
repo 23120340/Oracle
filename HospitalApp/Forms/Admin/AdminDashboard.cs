@@ -98,15 +98,15 @@ public class AdminDashboard : Form
         var header = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 60,
+            Height = 64,
             BackColor = UiTheme.Surface,
             Padding = new Padding(24, 12, 24, 12)
         };
         var title = new Label
         {
             Text = "Quản trị Cơ sở dữ liệu",
-            Dock = DockStyle.Left, Width = 400,
-            Font = UiTheme.Heading2(),
+            Dock = DockStyle.Left, Width = 420,
+            Font = UiTheme.Heading1(16f),
             ForeColor = UiTheme.TextDark,
             TextAlign = ContentAlignment.MiddleLeft,
             AutoEllipsis = true
@@ -121,11 +121,12 @@ public class AdminDashboard : Form
         {
             Text = "Đăng xuất",
             Glyph = IconRegistry.SignOut,
-            BackColor = UiTheme.BgLight,
+            BackColor = UiTheme.Surface,
             ForeColor = UiTheme.TextDark,
             GlyphColor = UiTheme.Danger,
+            BorderThickness = 1, BorderTint = UiTheme.BorderStrong,
             Anchor = AnchorStyles.Right | AnchorStyles.Top,
-            Width = 130, Height = 36
+            Width = 152, Height = 38
         };
         btnLogout.Click += (_, _) =>
         {
@@ -144,6 +145,7 @@ public class AdminDashboard : Form
         header.Controls.Add(roleChip);
         header.Controls.Add(btnLogout);
         header.Controls.Add(title);
+        header.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = UiTheme.Border });
         layoutHeader();
 
         // Sidebar
@@ -554,125 +556,199 @@ public class AdminDashboard : Form
     // ═══════════════════════════════════════════════════════════════════════════
     private TabPage BuildGrantTab()
     {
-        var page = new TabPage("Grant");
-        page.AutoScroll = true;
-        page.Padding = new Padding(14, 10, 14, 14);
+        var page = new TabPage("Grant") { BackColor = UiTheme.BgLight };
 
-        int y = 10;
-        // Grantee
-        page.Controls.Add(Lbl("Cấp cho (User/Role):", 10, y));
-        _cmbGrantee = Cmb(200, y, 240); page.Controls.Add(_cmbGrantee);
+        // Helper cục bộ — style nhất quán, tránh lặp.
+        Panel GrantCard() => new()
+        {
+            Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            BackColor = UiTheme.Surface, Padding = new Padding(UiTheme.Spacing4),
+            Margin = new Padding(0, 0, 0, UiTheme.Spacing4)
+        };
+        Label GLbl(string t) => new()
+        {
+            Text = t, AutoSize = true, Font = UiTheme.LabelBold(9f),
+            ForeColor = UiTheme.TextDark, Anchor = AnchorStyles.Left,
+            Margin = new Padding(0, 0, UiTheme.Spacing2, 0)
+        };
+        Label GTitle(string t) => new()
+        {
+            Text = t, AutoSize = true, Font = UiTheme.Heading3(10.5f),
+            ForeColor = UiTheme.Primary, Margin = new Padding(0, 0, 0, UiTheme.Spacing2)
+        };
+        void Stretch(ComboBox c)
+        {
+            c.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            c.Margin = new Padding(0, 4, UiTheme.Spacing2, 4);
+        }
 
-        // Loại grant
-        page.Controls.Add(Lbl("Loại:", 470, y));
-        _cmbGrantType = new ComboBox { Location = new Point(520, y), Size = new Size(180, 30) };
+        // Khung dọc: [grantee + loại] + 1 trong 3 thẻ quyền (toggled Visible -> hàng AutoSize tự co).
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5,
+            Padding = new Padding(UiTheme.Spacing5, UiTheme.Spacing4, UiTheme.Spacing5, UiTheme.Spacing4),
+            BackColor = UiTheme.BgLight, AutoScroll = true
+        };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));     // 0 head
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));     // 1 object priv
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));     // 2 system priv
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));     // 3 role
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // 4 slack
+
+        // ── Head: chọn grantee + loại quyền ──
+        var head = GrantCard();
+        var headTbl = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 2, RowCount = 2, BackColor = UiTheme.Surface, Margin = Padding.Empty
+        };
+        headTbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62));
+        headTbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38));
+        headTbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
+        headTbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+        headTbl.Controls.Add(GLbl("Cấp cho (User / Role)"), 0, 0);
+        headTbl.Controls.Add(GLbl("Loại quyền"), 1, 0);
+        _cmbGrantee = Cmb(0, 0, 200); Stretch(_cmbGrantee);
+        headTbl.Controls.Add(_cmbGrantee, 0, 1);
+        _cmbGrantType = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Body() };
         _cmbGrantType.Items.AddRange(new[] { "Object Privilege", "System Privilege", "Role" });
-        _cmbGrantType.DropDownStyle = ComboBoxStyle.DropDownList;
+        Stretch(_cmbGrantType);
         _cmbGrantType.SelectedIndex = 0;
         _cmbGrantType.SelectedIndexChanged += CmbGrantType_Changed;
-        page.Controls.Add(_cmbGrantType);
+        headTbl.Controls.Add(_cmbGrantType, 1, 1);
+        head.Controls.Add(headTbl);
+        root.Controls.Add(head, 0, 0);
 
-        y += 40;
-        // ── Object Privilege panel ──────────────────────────────────────────
-        _pnlObjectPriv = new Panel
+        // ── Object Privilege card ──
+        _pnlObjectPriv = GrantCard();
+        var objTbl = new TableLayoutPanel
         {
-            Location = new Point(10, y), Size = new Size(980, 320),
-            BorderStyle = BorderStyle.FixedSingle,
-            BackColor = UiTheme.Surface
+            Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 1, RowCount = 6, BackColor = UiTheme.Surface, Margin = Padding.Empty
         };
-        _pnlObjectPriv.Controls.Add(new Label
+        objTbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        objTbl.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // title
+        objTbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));  // obj selection
+        objTbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));  // priv + grant option
+        objTbl.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // col note
+        objTbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 120)); // columns list
+        objTbl.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // grant button
+        objTbl.Controls.Add(GTitle("Object Privilege"), 0, 0);
+
+        // Hàng chọn đối tượng (6 cột: nhãn/combo × 3)
+        var objSel = new TableLayoutPanel
         {
-            Text = "OBJECT PRIVILEGE", Font = UiTheme.LabelBold(),
-            Location = new Point(10, 5), AutoSize = true, ForeColor = UiTheme.Primary
-        });
-        int py = 30;
-        _pnlObjectPriv.Controls.Add(Lbl("Loại đối tượng:", 10, py));
-        _cmbObjType = new ComboBox { Location = new Point(150, py), Size = new Size(150, 30) };
+            Dock = DockStyle.Fill, ColumnCount = 6, RowCount = 1,
+            BackColor = UiTheme.Surface, Margin = Padding.Empty
+        };
+        objSel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        objSel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        objSel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
+        objSel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        objSel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
+        objSel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        objSel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34));
+        _cmbObjType = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Body() };
         _cmbObjType.Items.AddRange(new[] { "TABLE", "VIEW", "PROCEDURE", "FUNCTION" });
-        _cmbObjType.DropDownStyle = ComboBoxStyle.DropDownList;
+        Stretch(_cmbObjType);
         _cmbObjType.SelectedIndex = 0;
         _cmbObjType.SelectedIndexChanged += CmbObjType_Changed;
-        _pnlObjectPriv.Controls.Add(_cmbObjType);
+        _cmbObjSchema = Cmb(0, 0, 190); Stretch(_cmbObjSchema);
+        _cmbObjSchema.SelectedIndexChanged += LoadObjectNames;
+        _cmbObjName = Cmb(0, 0, 240); Stretch(_cmbObjName);
+        _cmbObjName.SelectedIndexChanged += LoadColumns;
+        objSel.Controls.Add(GLbl("Loại đối tượng"), 0, 0);
+        objSel.Controls.Add(_cmbObjType, 1, 0);
+        objSel.Controls.Add(GLbl("Schema"), 2, 0);
+        objSel.Controls.Add(_cmbObjSchema, 3, 0);
+        objSel.Controls.Add(GLbl("Đối tượng"), 4, 0);
+        objSel.Controls.Add(_cmbObjName, 5, 0);
+        objTbl.Controls.Add(objSel, 0, 1);
 
-        _pnlObjectPriv.Controls.Add(Lbl("Schema:", 330, py));
-        _cmbObjSchema = Cmb(430, py, 190); _cmbObjSchema.SelectedIndexChanged += LoadObjectNames;
-        _pnlObjectPriv.Controls.Add(_cmbObjSchema);
-
-        _pnlObjectPriv.Controls.Add(Lbl("Đối tượng:", 650, py));
-        _cmbObjName = Cmb(770, py, 240); _cmbObjName.SelectedIndexChanged += LoadColumns;
-        _pnlObjectPriv.Controls.Add(_cmbObjName);
-
-        py += 35;
-        _pnlObjectPriv.Controls.Add(Lbl("Quyền:", 10, py));
-        _cmbPrivilege = new ComboBox { Location = new Point(90, py), Size = new Size(160, 30) };
-        _cmbPrivilege.DropDownStyle = ComboBoxStyle.DropDownList;
-        _cmbPrivilege.SelectedIndexChanged += CmbPrivilege_Changed;
-        _pnlObjectPriv.Controls.Add(_cmbPrivilege);
-        UpdatePrivilegesForObjectType();
-
-        _chkGrantOption = new CheckBox
-        {
-            Text     = "WITH GRANT OPTION",
-            Location = new Point(285, py),
-            AutoSize = true,
-            Font     = UiTheme.Body()
-        };
-        _pnlObjectPriv.Controls.Add(_chkGrantOption);
-
-        py += 35;
+        // Hàng quyền + WITH GRANT OPTION (tạo _clbColumns/_lblColNote TRƯỚC khi
+        // UpdatePrivilegesForObjectType() vì nó set SelectedIndex -> kích CmbPrivilege_Changed).
         _lblColNote = new Label
         {
-            Text      = "Cột (SELECT/UPDATE cho phép chọn cột – bỏ trống = tất cả):",
-            Location  = new Point(10, py),
-            AutoSize  = true,
-            ForeColor = Color.DimGray
+            Text = "Cột (SELECT/UPDATE mới chọn được cột – bỏ trống = tất cả):",
+            AutoSize = true, ForeColor = Color.DimGray, Anchor = AnchorStyles.Left,
+            Margin = new Padding(0, UiTheme.Spacing2, 0, 2)
         };
-        _pnlObjectPriv.Controls.Add(_lblColNote);
-
-        py += 25;
         _clbColumns = new CheckedListBox
         {
-            Location      = new Point(10, py),
-            Size          = new Size(820, 104),
-            CheckOnClick  = true,
-            ScrollAlwaysVisible = false
+            Dock = DockStyle.Fill, CheckOnClick = true, ScrollAlwaysVisible = false,
+            Margin = new Padding(0, 0, 0, UiTheme.Spacing2), Font = UiTheme.Body()
         };
-        _pnlObjectPriv.Controls.Add(_clbColumns);
+        var privRow = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1,
+            BackColor = UiTheme.Surface, Margin = Padding.Empty
+        };
+        privRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        privRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        privRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 200));
+        privRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        _cmbPrivilege = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Body() };
+        Stretch(_cmbPrivilege);
+        _cmbPrivilege.SelectedIndexChanged += CmbPrivilege_Changed;
+        _chkGrantOption = new CheckBox { Text = "WITH GRANT OPTION", AutoSize = true,
+                                         Font = UiTheme.Body(), Anchor = AnchorStyles.Left };
+        privRow.Controls.Add(GLbl("Quyền"), 0, 0);
+        privRow.Controls.Add(_cmbPrivilege, 1, 0);
+        privRow.Controls.Add(_chkGrantOption, 2, 0);
+        objTbl.Controls.Add(privRow, 0, 2);
+        UpdatePrivilegesForObjectType();
 
-        py += 116;
+        objTbl.Controls.Add(_lblColNote, 0, 3);
+        objTbl.Controls.Add(_clbColumns, 0, 4);
+
         _btnGrant = Btn("Thực hiện GRANT", UiTheme.HealthGreen, width: 190);
-        _btnGrant.Location = new Point(10, py);
+        _btnGrant.Anchor = AnchorStyles.Left;
+        _btnGrant.Margin = new Padding(0, UiTheme.Spacing2, 0, 0);
         _btnGrant.Click += BtnGrant_Click;
-        _pnlObjectPriv.Controls.Add(_btnGrant);
+        objTbl.Controls.Add(_btnGrant, 0, 5);
+        _pnlObjectPriv.Controls.Add(objTbl);
+        root.Controls.Add(_pnlObjectPriv, 0, 1);
 
-        page.Controls.Add(_pnlObjectPriv);
-
-        // ── System Privilege panel ─────────────────────────────────────────
-        _pnlSysPriv = new Panel
+        // ── System Privilege card ──
+        _pnlSysPriv = GrantCard();
+        _pnlSysPriv.Visible = false;
+        var sysTbl = new TableLayoutPanel
         {
-            Location = new Point(10, y), Size = new Size(980, 148),
-            BorderStyle = BorderStyle.FixedSingle, Visible = false,
-            BackColor = UiTheme.Surface
+            Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 1, RowCount = 3, BackColor = UiTheme.Surface, Margin = Padding.Empty
         };
-        _pnlSysPriv.Controls.Add(new Label
+        sysTbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        sysTbl.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        sysTbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+        sysTbl.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        sysTbl.Controls.Add(GTitle("System Privilege"), 0, 0);
+        var sysRow = new TableLayoutPanel
         {
-            Text = "SYSTEM PRIVILEGE", Font = UiTheme.LabelBold(),
-            Location = new Point(10, 5), AutoSize = true, ForeColor = UiTheme.Primary
-        });
-        _pnlSysPriv.Controls.Add(Lbl("Quyền hệ thống:", 10, 35));
-        _cmbSysPriv = new ComboBox { Location = new Point(155, 35), Size = new Size(280, 30) };
-        _cmbSysPriv.DropDownStyle = ComboBoxStyle.DropDownList;
+            Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1,
+            BackColor = UiTheme.Surface, Margin = Padding.Empty
+        };
+        sysRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        sysRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        sysRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        sysRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        _cmbSysPriv = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Body() };
         _cmbSysPriv.Items.AddRange(new[]
         {
             "CREATE SESSION","CREATE TABLE","CREATE VIEW","CREATE PROCEDURE",
             "CREATE TRIGGER","CREATE SEQUENCE","CREATE USER","DROP USER",
             "ALTER USER","GRANT ANY PRIVILEGE","DBA","CONNECT","RESOURCE"
         });
-        _pnlSysPriv.Controls.Add(_cmbSysPriv);
-        var chkAdminOpt = new CheckBox { Text = "WITH ADMIN OPTION", Location = new Point(455, 35), AutoSize = true };
-        _pnlSysPriv.Controls.Add(chkAdminOpt);
+        Stretch(_cmbSysPriv);
+        var chkAdminOpt = new CheckBox { Text = "WITH ADMIN OPTION", AutoSize = true,
+                                         Anchor = AnchorStyles.Left, Font = UiTheme.Body() };
+        sysRow.Controls.Add(GLbl("Quyền hệ thống"), 0, 0);
+        sysRow.Controls.Add(_cmbSysPriv, 1, 0);
+        sysRow.Controls.Add(chkAdminOpt, 2, 0);
+        sysTbl.Controls.Add(sysRow, 0, 1);
         var btnGrantSys = Btn("GRANT", UiTheme.HealthGreen);
-        btnGrantSys.Location = new Point(10, 82);
+        btnGrantSys.Anchor = AnchorStyles.Left;
+        btnGrantSys.Margin = new Padding(0, UiTheme.Spacing2, 0, 0);
         btnGrantSys.Click += (_, _) =>
         {
             TryCatch(() =>
@@ -684,26 +760,38 @@ public class AdminDashboard : Form
                 Success($"GRANT {priv} TO {grantee} thành công.");
             });
         };
-        _pnlSysPriv.Controls.Add(btnGrantSys);
-        page.Controls.Add(_pnlSysPriv);
+        sysTbl.Controls.Add(btnGrantSys, 0, 2);
+        _pnlSysPriv.Controls.Add(sysTbl);
+        root.Controls.Add(_pnlSysPriv, 0, 2);
 
-        // ── Role grant panel ───────────────────────────────────────────────
-        _pnlRole = new Panel
+        // ── Role grant card ──
+        _pnlRole = GrantCard();
+        _pnlRole.Visible = false;
+        var roleTbl = new TableLayoutPanel
         {
-            Location = new Point(10, y), Size = new Size(980, 118),
-            BorderStyle = BorderStyle.FixedSingle, Visible = false,
-            BackColor = UiTheme.Surface
+            Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 1, RowCount = 3, BackColor = UiTheme.Surface, Margin = Padding.Empty
         };
-        _pnlRole.Controls.Add(new Label
+        roleTbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        roleTbl.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        roleTbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+        roleTbl.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        roleTbl.Controls.Add(GTitle("Grant Role"), 0, 0);
+        var roleRow = new TableLayoutPanel
         {
-            Text = "GRANT ROLE", Font = UiTheme.LabelBold(),
-            Location = new Point(10, 5), AutoSize = true, ForeColor = UiTheme.Primary
-        });
-        _pnlRole.Controls.Add(Lbl("Role:", 10, 35));
-        _cmbGrantRole = Cmb(70, 35, 200);
-        _pnlRole.Controls.Add(_cmbGrantRole);
-        var btnGrantRole = Btn("GRANT ROLE", UiTheme.HealthGreen, 140);
-        btnGrantRole.Location = new Point(290, 32);
+            Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
+            BackColor = UiTheme.Surface, Margin = Padding.Empty
+        };
+        roleRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        roleRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        roleRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        _cmbGrantRole = Cmb(0, 0, 200); Stretch(_cmbGrantRole);
+        roleRow.Controls.Add(GLbl("Role"), 0, 0);
+        roleRow.Controls.Add(_cmbGrantRole, 1, 0);
+        roleTbl.Controls.Add(roleRow, 0, 1);
+        var btnGrantRole = Btn("GRANT ROLE", UiTheme.HealthGreen, 150);
+        btnGrantRole.Anchor = AnchorStyles.Left;
+        btnGrantRole.Margin = new Padding(0, UiTheme.Spacing2, 0, 0);
         btnGrantRole.Click += (_, _) =>
         {
             TryCatch(() =>
@@ -714,25 +802,11 @@ public class AdminDashboard : Form
                 Success($"GRANT {role} TO {grantee} thành công.");
             });
         };
-        _pnlRole.Controls.Add(btnGrantRole);
-        page.Controls.Add(_pnlRole);
+        roleTbl.Controls.Add(btnGrantRole, 0, 2);
+        _pnlRole.Controls.Add(roleTbl);
+        root.Controls.Add(_pnlRole, 0, 3);
 
-        void resizeGrantPanels()
-        {
-            if (_pnlObjectPriv is null || _pnlSysPriv is null || _pnlRole is null || _clbColumns is null)
-                return;
-
-            var panelWidth = Math.Max(760, page.ClientSize.Width - 40);
-            _pnlObjectPriv.Width = panelWidth;
-            _pnlObjectPriv.Height = 320;
-            _pnlSysPriv.Width = panelWidth;
-            _pnlSysPriv.Height = 148;
-            _pnlRole.Width = panelWidth;
-            _pnlRole.Height = 118;
-            _clbColumns.Width = Math.Max(360, panelWidth - 180);
-        }
-        page.Resize += (_, _) => resizeGrantPanels();
-        resizeGrantPanels();
+        page.Controls.Add(root);
 
         page.Enter += (_, _) =>
         {
@@ -1120,8 +1194,8 @@ public class AdminDashboard : Form
                 Padding = new Padding(0, 8, 0, 0) };
 
     private static TextBox TB(int width, bool isPass = false) =>
-        new() { Width = width, Height = 30, Font = UiTheme.Body(),
-                PasswordChar = isPass ? '●' : '\0', BorderStyle = BorderStyle.FixedSingle };
+        UiTheme.Pad(new() { Width = width, Height = 34, Font = UiTheme.Body(),
+                PasswordChar = isPass ? '•' : '\0', BorderStyle = BorderStyle.FixedSingle });
 
     private static Button Btn(string text, Color backColor, int width = 120)
     {

@@ -157,19 +157,24 @@ public class BSForm : Form
     // ═══════════════════════════════════════════════════════════════════════════
     private TabPage BuildHSBATab()
     {
-        var page = new TabPage("Hồ sơ bệnh án");
-        var split = new SplitContainer
+        var page = new TabPage("Hồ sơ bệnh án") { BackColor = UiTheme.BgLight };
+        // FIX (Ảnh 3): thay SplitContainer (Panel2 bị ép ngắn → 2 ô textarea dưới co về 0,
+        // gõ không hiện chữ) bằng TableLayoutPanel: danh sách trên co giãn (Percent), vùng chi tiết
+        // dưới cao CỐ ĐỊNH 400px → 3 ô Chẩn đoán/Điều trị/Kết luận luôn đủ chỗ hiển thị & sửa.
+        var outer = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill,
-            Orientation = Orientation.Horizontal,
-            SplitterDistance = 200
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
+            Margin = Padding.Empty, Padding = Padding.Empty, BackColor = UiTheme.BgLight
         };
+        outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 400));
 
         // Top: danh sách HSBA
         _dgvHSBA = MakeGrid();
         _dgvHSBA.Dock = DockStyle.Fill;
         _dgvHSBA.SelectionChanged += DgvHSBA_SelectionChanged;
-        split.Panel1.Controls.Add(_dgvHSBA);
+        // (đưa vào topLayout ở dưới)
 
         // Bottom: chi tiết + HSBA_DV + ĐƠNTHUỐC
         var detail = new TabControl { Dock = DockStyle.Fill };
@@ -197,22 +202,22 @@ public class BSForm : Form
         fl.RowStyles.Add(new RowStyle(SizeType.AutoSize));                 // 7: nút Lưu
 
         _lblHSBAId = new Label { AutoSize = true, Font = UiTheme.LabelBold(),
-                                 ForeColor = Color.Navy, Margin = new Padding(0, 0, 0, 6) };
+                                 ForeColor = UiTheme.TextDark, Margin = new Padding(0, 0, 0, 6) };
         fl.Controls.Add(_lblHSBAId, 0, 0);
 
         fl.Controls.Add(new Label { Text = "Chẩn đoán:", AutoSize = true,
                                     Margin = new Padding(0, 2, 0, 2) }, 0, 1);
-        _txtChandoan = TBFill(80);
+        _txtChandoan = TBFill(56);
         fl.Controls.Add(_txtChandoan, 0, 2);
 
         fl.Controls.Add(new Label { Text = "Điều trị:", AutoSize = true,
                                     Margin = new Padding(0, 2, 0, 2) }, 0, 3);
-        _txtDieutri = TBFill(80);
+        _txtDieutri = TBFill(56);
         fl.Controls.Add(_txtDieutri, 0, 4);
 
         fl.Controls.Add(new Label { Text = "Kết luận:", AutoSize = true,
                                     Margin = new Padding(0, 2, 0, 2) }, 0, 5);
-        _txtKetluan = TBFill(80);
+        _txtKetluan = TBFill(56);
         fl.Controls.Add(_txtKetluan, 0, 6);
 
         _btnSaveHSBA = Btn("Lưu HSBA", UiTheme.HealthGreen);
@@ -239,7 +244,8 @@ public class BSForm : Form
             ColumnCount = 1,
             RowCount = 2,
             Margin = Padding.Empty,
-            Padding = Padding.Empty
+            Padding = new Padding(UiTheme.Spacing3, UiTheme.Spacing3, UiTheme.Spacing3, UiTheme.Spacing2),
+            BackColor = UiTheme.BgLight
         };
         dvLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         dvLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
@@ -256,30 +262,58 @@ public class BSForm : Form
         var tDT = new TabPage("Đơn thuốc");
         var dtPanel = new Panel { Dock = DockStyle.Fill };
         _dgvDT = MakeGrid(); _dgvDT.Dock = DockStyle.Fill;
-        var dtBot = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 80, Padding = new Padding(4),
-                                          FlowDirection = FlowDirection.LeftToRight,
-                                          WrapContents = false, AutoScroll = true };
-        dtBot.Controls.Add(new Label { Text = "Thuốc:", AutoSize = true, Padding = new Padding(0, 8, 0, 0) });
-        _txtTenthuoc = new TextBox { Width = 160, Font = UiTheme.Body() };
-        dtBot.Controls.Add(_txtTenthuoc);
-        dtBot.Controls.Add(new Label { Text = "Liều:", AutoSize = true, Padding = new Padding(0, 8, 0, 0) });
-        _txtLieudung = new TextBox { Width = 160, Font = UiTheme.Body() };
-        dtBot.Controls.Add(_txtLieudung);
-        var btnAddDT = Btn("Thêm", UiTheme.HealthCyan);
-        var btnDelDT = Btn("Xóa", UiTheme.Danger);
+        // FIX: hàng nhập thuốc dùng TableLayoutPanel (không FlowLayoutPanel) — 2 ô nhập co giãn
+        // theo cột Percent, nhãn ở ô AutoSize riêng (canh giữa bằng Anchor), 2 nút ở ô Absolute.
+        var dtBot = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 6,
+            RowCount = 1,
+            Padding = new Padding(UiTheme.Spacing2, UiTheme.Spacing2, UiTheme.Spacing2, UiTheme.Spacing2),
+            Margin = Padding.Empty,
+            BackColor = UiTheme.BgLight
+        };
+        dtBot.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        dtBot.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));        // 0: "Thuốc:"
+        dtBot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));    // 1: tên thuốc
+        dtBot.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));        // 2: "Liều:"
+        dtBot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));    // 3: liều dùng
+        dtBot.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));        // 4: nút Thêm
+        dtBot.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));        // 5: nút Xóa
+
+        dtBot.Controls.Add(new Label { Text = "Thuốc:", AutoSize = true,
+                                       Anchor = AnchorStyles.Left,
+                                       Margin = new Padding(0, 0, UiTheme.Spacing2, 0) }, 0, 0);
+        _txtTenthuoc = new TextBox { Dock = DockStyle.Fill, Height = 30, Font = UiTheme.Body(),
+                                     Margin = new Padding(0, 4, UiTheme.Spacing3, 4) };
+        dtBot.Controls.Add(_txtTenthuoc, 1, 0);
+        dtBot.Controls.Add(new Label { Text = "Liều:", AutoSize = true,
+                                       Anchor = AnchorStyles.Left,
+                                       Margin = new Padding(0, 0, UiTheme.Spacing2, 0) }, 2, 0);
+        _txtLieudung = new TextBox { Dock = DockStyle.Fill, Height = 30, Font = UiTheme.Body(),
+                                     Margin = new Padding(0, 4, UiTheme.Spacing3, 4) };
+        dtBot.Controls.Add(_txtLieudung, 3, 0);
+        var btnAddDT = Btn("Thêm", UiTheme.HealthCyan, 110);
+        var btnDelDT = Btn("Xóa", UiTheme.Danger, 110);
+        btnAddDT.Anchor = AnchorStyles.None;
+        btnDelDT.Anchor = AnchorStyles.None;
+        btnAddDT.Margin = new Padding(0, 0, UiTheme.Spacing2, 0);
+        btnDelDT.Margin = Padding.Empty;
         btnAddDT.Click += BtnAddDT_Click;
         btnDelDT.Click += BtnDelDT_Click;
-        dtBot.Controls.AddRange(new Control[] { btnAddDT, btnDelDT });
+        dtBot.Controls.Add(btnAddDT, 4, 0);
+        dtBot.Controls.Add(btnDelDT, 5, 0);
         var dtLayout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 2,
             Margin = Padding.Empty,
-            Padding = Padding.Empty
+            Padding = new Padding(UiTheme.Spacing3, UiTheme.Spacing3, UiTheme.Spacing3, 0),
+            BackColor = UiTheme.BgLight
         };
         dtLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        dtLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 92));
+        dtLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
         dtLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         _dgvDT.Margin = Padding.Empty;
         dtBot.Dock = DockStyle.Fill;
@@ -290,7 +324,7 @@ public class BSForm : Form
         tDT.Controls.Add(dtPanel);
 
         detail.TabPages.AddRange(new[] { tDetail, tDV, tDT });
-        split.Panel2.Controls.Add(detail);
+        outer.Controls.Add(detail, 0, 1);
 
         var btnRefresh = Btn("Tải HSBA", UiTheme.HealthCyan);
         btnRefresh.Dock = DockStyle.Top;
@@ -309,12 +343,11 @@ public class BSForm : Form
         btnRefresh.Dock = DockStyle.Fill;
         btnRefresh.Margin = Padding.Empty;
         _dgvHSBA.Margin = Padding.Empty;
-        split.Panel1.Controls.Clear();
         topLayout.Controls.Add(btnRefresh, 0, 0);
         topLayout.Controls.Add(_dgvHSBA, 0, 1);
-        split.Panel1.Controls.Add(topLayout);
+        outer.Controls.Add(topLayout, 0, 0);
 
-        page.Controls.Add(split);
+        page.Controls.Add(outer);
         page.Enter += (_, _) => LoadHSBA();
         return page;
     }
@@ -544,19 +577,49 @@ public class BSForm : Form
         bnLeftLayout.Controls.Add(_dgvBN, 0, 1);
         split.Panel1.Controls.Add(bnLeftLayout);
 
-        var fl = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
-                                       Padding = new Padding(10), AutoScroll = true };
-        _lblBNId = new Label { AutoSize = true, Font = UiTheme.LabelBold(), ForeColor = Color.Navy };
-        fl.Controls.Add(_lblBNId);
-        fl.Controls.Add(new Label { Text = "Tiền sử bệnh:", AutoSize = true });
-        _txtTSB = TB(600, 60); fl.Controls.Add(_txtTSB);
-        fl.Controls.Add(new Label { Text = "Tiền sử bệnh gia đình:", AutoSize = true });
-        _txtTSBGD = TB(600, 60); fl.Controls.Add(_txtTSBGD);
-        fl.Controls.Add(new Label { Text = "Dị ứng thuốc:", AutoSize = true });
-        _txtDiung = TB(600, 30); fl.Controls.Add(_txtDiung);
-        _btnSaveBN = Btn("Cập nhật tiền sử", UiTheme.HealthGreen, 170);
+        // FIX: thay FlowLayoutPanel + TextBox cố định 600px (bị cắt/không co giãn) bằng
+        // TableLayoutPanel với RowStyles tường minh — 3 textarea Dock=Fill trải hết bề ngang,
+        // chia đều phần dọc, nhãn nằm ô AutoSize riêng, nút Lưu ở hàng Absolute 56px dưới cùng.
+        var fl = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 8,
+            Padding = new Padding(UiTheme.Spacing4, UiTheme.Spacing3, UiTheme.Spacing4, UiTheme.Spacing3),
+            BackColor = UiTheme.BgLight,
+            AutoScroll = true
+        };
+        fl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        fl.RowStyles.Add(new RowStyle(SizeType.AutoSize));                 // 0: MABN id
+        fl.RowStyles.Add(new RowStyle(SizeType.AutoSize));                 // 1: label Tiền sử bệnh
+        fl.RowStyles.Add(new RowStyle(SizeType.Percent, 40));             // 2: textarea Tiền sử bệnh
+        fl.RowStyles.Add(new RowStyle(SizeType.AutoSize));                 // 3: label Tiền sử bệnh GĐ
+        fl.RowStyles.Add(new RowStyle(SizeType.Percent, 40));             // 4: textarea Tiền sử bệnh GĐ
+        fl.RowStyles.Add(new RowStyle(SizeType.AutoSize));                 // 5: label Dị ứng thuốc
+        fl.RowStyles.Add(new RowStyle(SizeType.Percent, 20));             // 6: textarea Dị ứng thuốc
+        fl.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));            // 7: nút Lưu
+
+        _lblBNId = new Label { AutoSize = true, Font = UiTheme.LabelBold(), ForeColor = UiTheme.TextDark,
+                               Margin = new Padding(0, 0, 0, UiTheme.Spacing1) };
+        fl.Controls.Add(_lblBNId, 0, 0);
+
+        fl.Controls.Add(new Label { Text = "Tiền sử bệnh:", AutoSize = true,
+                                    Margin = new Padding(0, 2, 0, 2) }, 0, 1);
+        _txtTSB = TBFill(60); fl.Controls.Add(_txtTSB, 0, 2);
+
+        fl.Controls.Add(new Label { Text = "Tiền sử bệnh gia đình:", AutoSize = true,
+                                    Margin = new Padding(0, 2, 0, 2) }, 0, 3);
+        _txtTSBGD = TBFill(60); fl.Controls.Add(_txtTSBGD, 0, 4);
+
+        fl.Controls.Add(new Label { Text = "Dị ứng thuốc:", AutoSize = true,
+                                    Margin = new Padding(0, 2, 0, 2) }, 0, 5);
+        _txtDiung = TBFill(40); fl.Controls.Add(_txtDiung, 0, 6);
+
+        _btnSaveBN = Btn("Cập nhật tiền sử", UiTheme.HealthGreen, 210);
+        _btnSaveBN.Anchor = AnchorStyles.Left;
+        _btnSaveBN.Margin = new Padding(0, UiTheme.Spacing2, 0, 0);
         _btnSaveBN.Click += BtnSaveBN_Click;
-        fl.Controls.Add(_btnSaveBN);
+        fl.Controls.Add(_btnSaveBN, 0, 7);
         split.Panel2.Controls.Add(fl);
 
         page.Controls.Add(split);
@@ -667,20 +730,22 @@ public class BSForm : Form
     private static DataGridView MakeGrid() => UiTheme.Grid();
 
     private static TextBox TB(int width, int height = 30) =>
-        new() { Multiline = height > 30, Width = width, Height = Math.Max(height, 30),
-                Font = UiTheme.Body(), ScrollBars = height > 30 ? ScrollBars.Vertical : ScrollBars.None };
+        UiTheme.Pad(new() { Multiline = height > 30, Width = width, Height = Math.Max(height, 30),
+                Font = UiTheme.Body(), BorderStyle = BorderStyle.FixedSingle,
+                ScrollBars = height > 30 ? ScrollBars.Vertical : ScrollBars.None });
 
     // Ô textarea trải hết bề ngang ô chứa (Dock=Fill) + co giãn theo hàng Percent, có chiều cao tối thiểu.
     private static TextBox TBFill(int minHeight = 80) =>
-        new()
+        UiTheme.Pad(new()
         {
             Multiline = true,
             Dock = DockStyle.Fill,
             MinimumSize = new Size(0, minHeight),
             Margin = new Padding(0, 0, 0, 8),
             Font = UiTheme.Body(),
+            BorderStyle = BorderStyle.FixedSingle,
             ScrollBars = ScrollBars.Vertical
-        };
+        });
 
     private static Button Btn(string text, Color color, int width = 140)
     {

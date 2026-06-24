@@ -44,6 +44,7 @@ Oracle/
 │   ├── setup_all.sql            ← Tổng hợp view + grant (chạy SAU CÙNG, bằng BVADMIN)
 │   ├── setup_admin_user.sql     ← Tạo HOSPITAL_DBA (tài khoản vào AdminDashboard)
 │   ├── fix_fga_ora28138.sql     ← Hotfix ORA-28138 (FGA predicate đơn) — chạy bằng BVADMIN, không cần -Reset
+│   ├── fix_ols_thongbao.sql     ← Hotfix gán nhãn OLS cho THONGBAO (u1–u8 không thấy thông báo)
 │   ├── run_migrations.ps1       ← Runner chạy 01→13 + setup_all
 │   └── REVIEW_LOI_PHANHE2.md    ← Báo cáo rà soát lỗi + trạng thái sửa (checklist)
 │
@@ -80,13 +81,15 @@ Oracle/
 Nếu **không** đặt `NLS_LANG` đúng trước khi chạy script chứa tiếng Việt, dữ liệu sẽ bị lưu sai byte → hiển thị `???` hoặc lỗi dấu. Đặt **trước khi mở** SQL\*Plus:
 
 ```powershell
-# PowerShell
+# PowerShell  ← PHẢI dùng cú pháp này trong PowerShell
 $env:NLS_LANG = ".AL32UTF8"
 ```
 ```cmd
-:: CMD
+:: CMD (cmd.exe) — KHÔNG dùng trong PowerShell
 set NLS_LANG=.AL32UTF8
 ```
+
+> ⚠️ **Bẫy thường gặp:** trong **PowerShell**, `set NLS_LANG=...` **KHÔNG** đặt biến môi trường (`set` là alias của `Set-Variable`) → sqlplus đọc file UTF-8 sai charset → tiếng Việt thành rác kiểu `ThÃ´ng bÃ¡o`. Bắt buộc dùng `$env:NLS_LANG = ".AL32UTF8"` rồi mới chạy `sqlplus` trong **cùng cửa sổ**.
 
 Kiểm tra character set của DB (phải là `AL32UTF8`):
 
@@ -107,9 +110,17 @@ OLS cần được cài và tài khoản `LBACSYS` được mở khoá. Trên XE
 ALTER SESSION SET CONTAINER = XEPDB1;          -- nếu là PDB
 -- Cài OLS nếu chưa có:
 @?/rdbms/admin/catols.sql
--- Mở khoá + đặt mật khẩu LBACSYS:
-ALTER USER LBACSYS IDENTIFIED BY lbacsys ACCOUNT UNLOCK;
 ```
+
+> ⚠️ **LBACSYS là COMMON USER** (dùng chung cả CDB). Đổi mật khẩu/mở khoá nó khi đang ở trong PDB
+> sẽ báo `ORA-65066: must apply to all containers`. Phải làm từ **CDB root** + `CONTAINER=ALL`:
+> ```powershell
+> sqlplus sys/"<mat_khau_SYS>"@localhost:1521/XE as sysdba   -- service XE = root, KHÔNG phải XEPDB1
+> ```
+> ```sql
+> ALTER USER LBACSYS IDENTIFIED BY "Lbac@2025" CONTAINER=ALL;
+> ```
+> (Nếu `@localhost:1521/XE` báo `ORA-12514`, dùng `sqlplus / as sysdba` để vào root.)
 
 Kiểm tra OLS đã bật:
 
@@ -288,6 +299,21 @@ Policy `BV_LABEL_POLICY`, nhãn **3 thành phần**:
 Nhãn dữ liệu mẫu t1–t7: `NV`, `BGD`, `LDK`, `LDK::TH`, `NV:HCM:TH`, `NV:HNI:TH`, `LDK:HPN:TH,TK`.
 User u1–u8 được gán `max_read_label` tương ứng (xem file 05). User u1–u8 được tạo bằng SYSTEM, gán nhãn bằng LBACSYS.
 
+> ⚠️ **Nếu đăng nhập u1–u8 mà KHÔNG thấy thông báo nào** (kể cả `u1_giamdoc` lẽ ra thấy đủ 7): các dòng
+> `THONGBAO` chưa được gán nhãn (cột `OLS_LABEL` = NULL). Hai nguyên nhân:
+> 1. Gán nhãn dòng phải chạy bằng **phiên BVADMIN thật** (có quyền FULL), KHÔNG chạy qua `setup.ps1`
+>    (vốn chạy mọi thứ dưới SYS).
+> 2. Policy chỉ bật `READ_CONTROL` nên `SA_SESSION.SET_ROW_LABEL` **không** tự gán nhãn khi INSERT —
+>    phải gán thẳng `OLS_LABEL = CHAR_TO_LABEL('BV_LABEL_POLICY', '<nhãn>')` trong câu INSERT.
+>
+> **Cách sửa nhanh** — chạy [PhanHe2/fix_ols_thongbao.sql](PhanHe2/fix_ols_thongbao.sql) bằng CONNECT thật:
+> ```powershell
+> $env:NLS_LANG = ".AL32UTF8"   # PowerShell — KHÔNG dùng "set" (xem §3)
+> sqlplus /nolog "@d:\repos\Oracle\PhanHe2\fix_ols_thongbao.sql"
+> ```
+> Yêu cầu trước đó: đã đặt mật khẩu LBACSYS (§4) và BVADMIN có quyền FULL (script tự cấp).
+> Kết quả đúng: cột `OLS_LABEL` in ra **có số** → đăng nhập `u1_giamdoc/U1@2025` thấy đủ 7 thông báo.
+
 ### Yêu cầu 3 — Kiểm toán
 
 - **Standard Audit:** 5 ngữ cảnh theo user/đối tượng cụ thể, cả thành công lẫn thất bại.
@@ -331,7 +357,11 @@ Tất cả kiểm soát truy cập do **Oracle DB Engine** thực thi (RBAC + VP
 | `PLS-00103 Encountered end-of-file` ở `EXEC ...` (file 02) | Comment `--` cùng dòng `EXEC` nuốt mất `END;` → **đã sửa** (bỏ comment cuối dòng); dùng bản file 02 mới |
 | `ORA-00933 SQL command not properly ended` ở câu GRANT/ALTER | Có comment `--` ngay sau `;` trên cùng dòng → SQL\*Plus không nhận `;` là dấu kết thúc → **đã sửa** (đưa comment lên dòng riêng) |
 | `Enter value for ...:` (prompt đứng im) | Ký tự `&` trong comment/chuỗi bị hiểu là biến thay thế → **đã sửa** (`setup.ps1` tự `SET DEFINE OFF`; bỏ `&` trong comment). Đang kẹt: bấm **Ctrl+C** để thoát |
-| Tiếng Việt thành `???` / lỗi dấu trong DB | Chưa `set NLS_LANG=.AL32UTF8` trước khi chạy 01 → chạy lại sau khi set, hoặc chạy `12_Fix_UTF8_Data.sql` bằng BVADMIN |
+| Tiếng Việt thành `???` / lỗi dấu trong DB | Chưa đặt `NLS_LANG=.AL32UTF8` trước khi chạy 01 → chạy lại sau khi set, hoặc chạy `12_Fix_UTF8_Data.sql` bằng BVADMIN |
+| Tiếng Việt thành `ThÃ´ng bÃ¡o` khi chạy file `.sql` bằng `sqlplus` trong **PowerShell** | Đã gõ `set NLS_LANG=...` (cú pháp CMD, vô tác dụng trong PowerShell) → sqlplus đọc UTF-8 sai. Dùng `$env:NLS_LANG = ".AL32UTF8"` rồi chạy lại trong cùng cửa sổ (xem §3) |
+| Đăng nhập u1–u8 OLS **không thấy thông báo nào** | `THONGBAO.OLS_LABEL` đang NULL (nhãn chưa gán) → chạy `PhanHe2/fix_ols_thongbao.sql` bằng CONNECT thật (xem §8 – Yêu cầu 2) |
+| `ORA-65066: must apply to all containers` khi `ALTER USER LBACSYS` | LBACSYS là common user → đổi từ **CDB root** (`@.../XE`) + `CONTAINER=ALL` (xem §4) |
+| `ORA-12154: could not resolve connect identifier` khi gõ tay trong PowerShell | Mật khẩu có ký tự `@` + PowerShell nuốt dấu `"` → sqlplus hiểu nhầm. Test bằng `sqlplus /nolog` rồi `CONNECT user/"pass@..."@host` bên trong; hoặc đổi mật khẩu không có `@` |
 | Tiếng Việt lỗi dấu trên giao diện | Dùng bản app mới (đã đổi `TO_CHAR`→`TO_NCHAR` + bind `NVarchar2`); rebuild lại |
 | File 05 lỗi `SA_*`/`LBACSYS` | OLS chưa được cài/mở khoá → xem §4 |
 | `ORA-01017 invalid username/password` khi chạy script | Mật khẩu CONNECT trong file chưa khớp DB → sửa lại (SYS/SYSTEM/LBACSYS/BVADMIN) — xem §2 |

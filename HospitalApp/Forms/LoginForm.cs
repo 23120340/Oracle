@@ -10,10 +10,13 @@ namespace HospitalApp.Forms;
 
 public sealed class LoginForm : Form
 {
-    private const int CardWidth = 400;
-    private const int FieldWidth = 328;
-    private const int CollapsedHeight = 610;
-    private const int ExpandedHeight = 745;
+    // ─── Split-card (brand trái + form phải) — phong cách minimalism, tông teal ───
+    private const int FormWidth   = 724;    // card 720 + 2px viền mảnh mỗi bên
+    private const int CardWidth   = 720;
+    private const int LeftWidth   = 290;    // panel thương hiệu bên trái
+    private const int FieldWidth  = 360;    // (giữ chữ ký; input thực tế Dock=Fill)
+    private const int CollapsedHeight = 406;   // = CollapsedCardHeight() + 4 (viền)
+    private const int ExpandedHeight  = 548;   // = ExpandedCardHeight() + 4
 
     private Panel _card = null!;
     private TableLayoutPanel _cardLayout = null!;
@@ -25,21 +28,20 @@ public sealed class LoginForm : Form
     private Label _lblStatus = null!, _btnClose = null!;
     private bool _advancedVisible;
 
-    // ─── Layout tokens (row heights of the card's TableLayoutPanel) ──────────────
-    // Card chrome = card.Padding (top+bottom) = 26 + 22 = 48
-    private const int CardChrome   = 48;
-    private const int RowEmblem    = 72;
-    private const int RowTitle     = 50;
+    // ─── Row heights của form bên phải (TableLayoutPanel 1 cột) ──────────────────
+    private const int RowTitle     = 42;
     private const int RowSubtitle  = 24;
-    private const int RowGapTop    = UiTheme.Spacing4;   // 16  (emblem block → fields)
-    private const int RowFieldLbl  = 22;
+    private const int RowGapTop    = UiTheme.Spacing3;   // 12
+    private const int RowFieldLbl  = 26;    // cao hơn + nhãn canh giữa → không bị ô nhập che
     private const int RowInput     = 44;
-    private const int RowGapField  = UiTheme.Spacing3;   // 12  (between field groups)
-    private const int RowStatus    = 40;
+    private const int RowStatus    = 28;
     private const int RowLogin     = 46;
-    private const int RowAdvBtn    = 30;
-    private const int RowAdvanced  = 150;                // advanced sub-table height
-    private const int RowFooter    = 24;
+    private const int RowAdvBtn    = 28;
+    private const int RowAdvanced  = 142;                // bảng nâng cao (host/port/sid)
+    private const int RowFooter    = 22;
+    private const int RightPadX    = 40;
+    private const int RightPadTop  = 34;
+    private const int RightPadBot  = 26;
 
     private static readonly Dictionary<string, (int count, DateTime until)> _failTracker = new();
     private const int MaxFail = 5;
@@ -48,12 +50,12 @@ public sealed class LoginForm : Form
     public LoginForm()
     {
         Text = "Đăng nhập – HospitalApp";
-        ClientSize = new Size(500, CollapsedHeight);
-        MinimumSize = new Size(500, CollapsedHeight);
-        MaximumSize = new Size(500, ExpandedHeight);
+        ClientSize = new Size(FormWidth, CollapsedHeight);
+        MinimumSize = new Size(FormWidth, CollapsedHeight);
+        MaximumSize = new Size(FormWidth, ExpandedHeight);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.None;
-        BackColor = UiTheme.Primary;
+        BackColor = UiTheme.BorderStrong;   // lộ ra 2px quanh card = viền mảnh ngoài
         Font = UiTheme.Body();
         DoubleBuffered = true;
 
@@ -73,45 +75,51 @@ public sealed class LoginForm : Form
             Text = IconRegistry.Close,
             Size = new Size(34, 34),
             TextAlign = ContentAlignment.MiddleCenter,
-            Font = IconRegistry.Icon(13f),
-            ForeColor = Color.White,
-            BackColor = UiTheme.Primary,
+            Font = IconRegistry.Icon(12f),
+            ForeColor = UiTheme.TextMuted,
+            BackColor = UiTheme.BgLight,
             Cursor = Cursors.Hand
         };
         _btnClose.Click += (_, _) => Application.Exit();
         Controls.Add(_btnClose);
 
-        // ── Glass card — its size is computed from the layout's preferred height ──
+        // ── Card 2 cột: TRÁI = thương hiệu (nền teal) · PHẢI = form đăng nhập (trắng) ──
         _card = new Panel
         {
             Size = new Size(CardWidth, CollapsedCardHeight()),
-            BackColor = UiTheme.Surface,
-            Padding = new Padding(36, 26, 36, 22)
+            BackColor = UiTheme.Surface
         };
-        _card.Paint += (_, e) => PaintRoundPanel(e.Graphics, _card.ClientRectangle, 20, UiTheme.Surface, null);
+        _card.Paint += (_, e) =>
+            PaintRoundPanel(e.Graphics, _card.ClientRectangle, 16, UiTheme.Surface, UiTheme.Border);
         Controls.Add(_card);
 
-        // ════════════════════════════════════════════════════════════════════════
-        //  ROOT LAYOUT inside the card: a single-column TableLayoutPanel.
-        //  EVERY logical block is its OWN row → no two controls ever share a cell,
-        //  so overlap / clipping is structurally impossible. AutoScroll on the
-        //  layout is the safety net if a future font makes content overflow.
-        // ════════════════════════════════════════════════════════════════════════
+        // PHẢI: panel form (thêm TRƯỚC để Fill phần còn lại) ----------------------
+        var right = new Panel
+        {
+            Dock = DockStyle.Fill, BackColor = UiTheme.Surface,
+            Padding = new Padding(RightPadX, RightPadTop, RightPadX, RightPadBot)
+        };
+        _card.Controls.Add(right);
+
+        // TRÁI: panel thương hiệu nền teal (thêm SAU → dock trước → chiếm cột trái) -
+        var brand = new Panel { Dock = DockStyle.Left, Width = LeftWidth, BackColor = UiTheme.Primary };
+        brand.Paint += (_, e) => DrawBrand(e.Graphics, brand.ClientRectangle);
+        _card.Controls.Add(brand);
+
+        // ── Form bên phải: TableLayoutPanel 1 cột, mỗi khối một hàng riêng ────────
         _cardLayout = new TableLayoutPanel
         {
             Dock        = DockStyle.Fill,
             BackColor   = UiTheme.Surface,
             ColumnCount = 1,
-            RowCount    = 14,
+            RowCount    = 12,
             AutoScroll  = true,
             Margin      = new Padding(0),
             Padding     = new Padding(0)
         };
         _cardLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        // 0 emblem | 1 title | 2 subtitle | 3 gap | 4 userLbl | 5 userInput
-        // 6 passLbl | 7 passInput | 8 status | 9 login | 10 advBtn
-        // 11 advanced (collapsible) | 12 footer | 13 slack (absorbs leftover)
-        _cardLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, RowEmblem));
+        // 0 title | 1 subtitle | 2 gap | 3 userLbl | 4 userInput | 5 passLbl
+        // 6 passInput | 7 status | 8 login | 9 advBtn | 10 advanced | 11 footer
         _cardLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, RowTitle));
         _cardLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, RowSubtitle));
         _cardLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, RowGapTop));
@@ -122,135 +130,139 @@ public sealed class LoginForm : Form
         _cardLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, RowStatus));
         _cardLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, RowLogin));
         _cardLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, RowAdvBtn));
-        _cardLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));               // advanced (0 when hidden)
+        _cardLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));               // advanced (0 khi ẩn)
         _cardLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, RowFooter));
-        _cardLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));          // slack absorber
-        _card.Controls.Add(_cardLayout);
+        right.Controls.Add(_cardLayout);
 
-        // ── Row 0: emblem (centered, drawn) ──────────────────────────────────────
-        var emblem = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, Margin = new Padding(0) };
-        emblem.Paint += (_, e) => DrawEmblem(e.Graphics, emblem.ClientRectangle);
-        _cardLayout.Controls.Add(emblem, 0, 0);
-
-        // ── Row 1: title ─────────────────────────────────────────────────────────
+        // Row 0: title
         _cardLayout.Controls.Add(new Label
-        {
-            Text = "Quản lý Bệnh viện",
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleCenter,
-            Font = UiTheme.Heading1(17f),
-            ForeColor = UiTheme.TextDark,
-            BackColor = UiTheme.Surface,
-            AutoEllipsis = false,
-            Margin = new Padding(0),
-            UseCompatibleTextRendering = true   // GDI+ render đúng diacritics ("ệ")
-        }, 0, 1);
-
-        // ── Row 2: subtitle ──────────────────────────────────────────────────────
-        _cardLayout.Controls.Add(new Label
-        {
-            Text = "Đăng nhập để tiếp tục",
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleCenter,
-            Font = UiTheme.Body(10.5f),
-            ForeColor = UiTheme.TextMuted,
-            BackColor = UiTheme.Surface,
-            Margin = new Padding(0),
-            UseCompatibleTextRendering = true
-        }, 0, 2);
-
-        // ── Row 3: gap (empty) — handled by RowStyle height ──────────────────────
-
-        // ── Rows 4-5: username ───────────────────────────────────────────────────
-        AddFieldLabel("Tài khoản", 4);
-        _txtUser = NewInput(false);
-        _cardLayout.Controls.Add(WrapInput(_txtUser, 0, 0, FieldWidth), 0, 5);
-
-        // ── Rows 6-7: password ───────────────────────────────────────────────────
-        AddFieldLabel("Mật khẩu", 6);
-        _txtPass = NewInput(true);
-        _txtPass.ShortcutsEnabled = false;
-        _cardLayout.Controls.Add(WrapPasswordInput(_txtPass, 0, 0, FieldWidth), 0, 7);
-
-        // ── Row 8: status / error message ────────────────────────────────────────
-        _lblStatus = new Label
-        {
-            Dock = DockStyle.Fill,
-            Font = UiTheme.Body(9f),
-            ForeColor = UiTheme.Danger,
-            TextAlign = ContentAlignment.MiddleLeft,
-            BackColor = UiTheme.Surface,
-            Margin = new Padding(2, 0, 2, 0)
-        };
-        _cardLayout.Controls.Add(_lblStatus, 0, 8);
-
-        // ── Row 9: login button ──────────────────────────────────────────────────
-        _btnLogin = new Button
         {
             Text = "Đăng nhập",
-            Dock = DockStyle.Fill,
-            BackColor = UiTheme.Primary,
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Font = UiTheme.Button(11f),
-            Cursor = Cursors.Hand,
-            Margin = new Padding(0, 0, 0, 2)
+            Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
+            Font = UiTheme.Heading1(19f), ForeColor = UiTheme.TextDark,
+            BackColor = UiTheme.Surface, Margin = new Padding(0),
+            UseCompatibleTextRendering = true
+        }, 0, 0);
+
+        // Row 1: subtitle
+        _cardLayout.Controls.Add(new Label
+        {
+            Text = "Nhập thông tin để tiếp tục",
+            Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
+            Font = UiTheme.Body(10f), ForeColor = UiTheme.TextMuted,
+            BackColor = UiTheme.Surface, Margin = new Padding(0),
+            UseCompatibleTextRendering = true
+        }, 0, 1);
+
+        // Row 2: gap
+
+        // Rows 3-4: username
+        AddFieldLabel("Tài khoản", 3);
+        _txtUser = NewInput(false);
+        _cardLayout.Controls.Add(WrapInput(_txtUser, 0, 0, FieldWidth), 0, 4);
+
+        // Rows 5-6: password
+        AddFieldLabel("Mật khẩu", 5);
+        _txtPass = NewInput(true);
+        _txtPass.ShortcutsEnabled = false;
+        _cardLayout.Controls.Add(WrapPasswordInput(_txtPass, 0, 0, FieldWidth), 0, 6);
+
+        // Row 7: status / error
+        _lblStatus = new Label
+        {
+            Dock = DockStyle.Fill, Font = UiTheme.Body(9f),
+            ForeColor = UiTheme.Danger, TextAlign = ContentAlignment.MiddleLeft,
+            BackColor = UiTheme.Surface, Margin = new Padding(2, 0, 2, 0)
+        };
+        _cardLayout.Controls.Add(_lblStatus, 0, 7);
+
+        // Row 8: login button
+        _btnLogin = new Button
+        {
+            Text = "Đăng nhập", Dock = DockStyle.Fill,
+            BackColor = UiTheme.Primary, ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat, Font = UiTheme.Button(11f),
+            Cursor = Cursors.Hand, Margin = new Padding(0, 0, 0, 2)
         };
         _btnLogin.FlatAppearance.BorderSize = 0;
         _btnLogin.FlatAppearance.MouseOverBackColor = UiTheme.PrimaryDark;
         _btnLogin.Click += BtnLogin_Click;
-        _btnLogin.Resize += (_, _) => RoundCorners(_btnLogin, 11);
-        RoundCorners(_btnLogin, 11);
-        _cardLayout.Controls.Add(_btnLogin, 0, 9);
+        _btnLogin.Resize += (_, _) => RoundCorners(_btnLogin, 10);
+        RoundCorners(_btnLogin, 10);
+        _cardLayout.Controls.Add(_btnLogin, 0, 8);
 
-        // ── Row 10: advanced toggle ──────────────────────────────────────────────
+        // Row 9: advanced toggle
         _btnAdvanced = new Button
         {
-            Text = "▸  Tùy chọn nâng cao",
-            Dock = DockStyle.Fill,
-            FlatStyle = FlatStyle.Flat,
-            BackColor = UiTheme.Surface,
-            ForeColor = UiTheme.TextMuted,
-            Font = UiTheme.Body(9f),
-            Cursor = Cursors.Hand,
-            TabStop = false,
-            Margin = new Padding(0)
+            Text = "▸  Tùy chọn nâng cao", Dock = DockStyle.Fill,
+            FlatStyle = FlatStyle.Flat, BackColor = UiTheme.Surface,
+            ForeColor = UiTheme.TextMuted, Font = UiTheme.Body(9f),
+            Cursor = Cursors.Hand, TabStop = false, Margin = new Padding(0),
+            TextAlign = ContentAlignment.MiddleLeft
         };
         _btnAdvanced.FlatAppearance.BorderSize = 0;
         _btnAdvanced.Click += (_, _) => ToggleAdvanced();
-        _cardLayout.Controls.Add(_btnAdvanced, 0, 10);
+        _cardLayout.Controls.Add(_btnAdvanced, 0, 9);
 
-        // ── Row 11: collapsible advanced panel (its own row → never overlaps) ─────
+        // Row 10: collapsible advanced panel
         _advancedPanel = new Panel
         {
-            Dock = DockStyle.Fill,
-            Height = RowAdvanced,
-            BackColor = UiTheme.Surface,
-            Margin = new Padding(0),
-            Visible = false
+            Dock = DockStyle.Fill, Height = RowAdvanced,
+            BackColor = UiTheme.Surface, Margin = new Padding(0), Visible = false
         };
         BuildAdvancedPanel();
-        _cardLayout.Controls.Add(_advancedPanel, 0, 11);
+        _cardLayout.Controls.Add(_advancedPanel, 0, 10);
 
-        // ── Row 12: footer (its OWN row — cannot be covered by the advanced block) ─
+        // Row 11: footer
         _footer = new Label
         {
             Text = "© 2026 HospitalApp · ATBM HTTT",
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleCenter,
-            Font = UiTheme.Body(8.5f),
-            ForeColor = UiTheme.TextMuted,
-            BackColor = UiTheme.Surface,
-            Margin = new Padding(0),
-            Name = "Footer"
+            Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
+            Font = UiTheme.Body(8.5f), ForeColor = UiTheme.TextFaint,
+            BackColor = UiTheme.Surface, Margin = new Padding(0), Name = "Footer"
         };
-        _cardLayout.Controls.Add(_footer, 0, 12);
+        _cardLayout.Controls.Add(_footer, 0, 11);
+    }
+
+    // Panel thương hiệu bên trái: emblem dấu cộng y tế + tên app + tagline (chữ trắng trên nền teal)
+    private static void DrawBrand(Graphics g, Rectangle r)
+    {
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+
+        int d = 88;
+        int cx = r.Width / 2;
+        int cy = r.Height / 2 - 44;
+        var circle = new Rectangle(cx - d / 2, cy - d / 2, d, d);
+        using (var bg = new SolidBrush(Color.FromArgb(38, 255, 255, 255)))
+            g.FillEllipse(bg, circle);
+        using (var pen = new Pen(Color.White, 7) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+        {
+            int arm = d / 4;
+            g.DrawLine(pen, cx, cy - arm, cx, cy + arm);
+            g.DrawLine(pen, cx - arm, cy, cx + arm, cy);
+        }
+
+        using var brandFont = UiTheme.Heading1(20f);
+        using var white = new SolidBrush(Color.White);
+        var b = g.MeasureString("HospitalApp", brandFont);
+        float by = cy + d / 2f + 14;
+        g.DrawString("HospitalApp", brandFont, white, cx - b.Width / 2, by);
+
+        using var tagFont = UiTheme.Body(9.5f);
+        using var tag = new SolidBrush(Color.FromArgb(225, 255, 255, 255));
+        string t1 = "Quản lý Bệnh viện";
+        string t2 = "An toàn & Bảo mật HTTT";
+        var s1 = g.MeasureString(t1, tagFont);
+        var s2 = g.MeasureString(t2, tagFont);
+        g.DrawString(t1, tagFont, tag, cx - s1.Width / 2, by + b.Height + 10);
+        g.DrawString(t2, tagFont, tag, cx - s2.Width / 2, by + b.Height + 10 + s1.Height + 2);
     }
 
     // Card height when advanced panel is hidden / shown — derived from row tokens
     // so the form, card and layout can never disagree (the source of the old overlap).
     private static int CollapsedCardHeight() =>
-        CardChrome + RowEmblem + RowTitle + RowSubtitle + RowGapTop +
+        RightPadTop + RightPadBot +
+        RowTitle + RowSubtitle + RowGapTop +
         RowFieldLbl + RowInput + RowFieldLbl + RowInput +
         RowStatus + RowLogin + RowAdvBtn + RowFooter;
 
@@ -263,11 +275,11 @@ public sealed class LoginForm : Form
         {
             Text = text,
             Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.BottomLeft,
+            TextAlign = ContentAlignment.MiddleLeft,   // FIX: canh giữa, chừa khoảng dưới → ô nhập không che chữ
             Font = UiTheme.LabelBold(9.5f),
             ForeColor = UiTheme.TextDark,
             BackColor = UiTheme.Surface,
-            Margin = new Padding(2, 0, 2, 2)
+            Margin = new Padding(2, 0, 2, 4)
         }, 0, row);
     }
 
@@ -333,7 +345,7 @@ public sealed class LoginForm : Form
     {
         BorderStyle = BorderStyle.None,
         Font = UiTheme.Body(11f),
-        PasswordChar = isPassword ? '●' : '\0',
+        PasswordChar = isPassword ? '•' : '\0',
         BackColor = Color.FromArgb(248, 250, 253)
     };
 
@@ -379,8 +391,8 @@ public sealed class LoginForm : Form
         _btnTogglePass.Click += (_, _) =>
         {
             var nowVisible = tb.PasswordChar == '\0';
-            // nếu đang hiện → bấm để ẩn (đặt char '●'); ngược lại
-            tb.PasswordChar = nowVisible ? '●' : '\0';
+            // nếu đang hiện → bấm để ẩn (đặt char '•'); ngược lại
+            tb.PasswordChar = nowVisible ? '•' : '\0';
             _btnTogglePass.Text = tb.PasswordChar == '\0'
                 ? IconRegistry.Eye       // đang hiện thật → icon eye open
                 : IconRegistry.EyeHide;  // đang ẩn → icon eye-strike (gợi ý click để hiện)
@@ -406,18 +418,19 @@ public sealed class LoginForm : Form
         _cardLayout.ResumeLayout(true);
 
         _card.Size = new Size(CardWidth, _advancedVisible ? ExpandedCardHeight() : CollapsedCardHeight());
-        ClientSize = new Size(500, _advancedVisible ? ExpandedHeight : CollapsedHeight);
-        RoundCorners(this, 18);
+        ClientSize = new Size(FormWidth, _advancedVisible ? ExpandedHeight : CollapsedHeight);
+        RoundCorners(this, 16);
         LayoutShell();
     }
 
     private void LayoutShell()
     {
-        _btnClose.Location = new Point(ClientSize.Width - 46, 12);
-        _card.Location = new Point((ClientSize.Width - _card.Width) / 2,
-            Math.Max(22, (ClientSize.Height - _card.Height) / 2 + 8));
-        RoundCorners(this, 18);
-        RoundCorners(_card, 20);
+        // Card lùi vào 2px → để lộ viền mảnh (BackColor form) bao quanh
+        _card.Location = new Point(2, 2);
+        _btnClose.Location = new Point(ClientSize.Width - 42, 10);
+        _btnClose.BringToFront();   // nổi trên card
+        RoundCorners(this, 16);
+        RoundCorners(_card, 16);
         _card.Invalidate();
     }
 

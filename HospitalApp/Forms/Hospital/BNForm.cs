@@ -95,14 +95,14 @@ public class BNForm : Form
     {
         var header = new Panel
         {
-            Dock = DockStyle.Top, Height = 60,
+            Dock = DockStyle.Top, Height = 64,
             BackColor = UiTheme.Surface,
             Padding = new Padding(24, 12, 24, 12)
         };
         var lblTitle = new Label
         {
-            Text = title, Dock = DockStyle.Left, Width = 300,
-            Font = UiTheme.Heading2(), ForeColor = UiTheme.TextDark,
+            Text = title, Dock = DockStyle.Left, Width = 320,
+            Font = UiTheme.Heading1(16f), ForeColor = UiTheme.TextDark,
             TextAlign = ContentAlignment.MiddleLeft,
             AutoEllipsis = true
         };
@@ -114,9 +114,10 @@ public class BNForm : Form
         var btnLogout = new RoundedButton
         {
             Text = "Đăng xuất", Glyph = IconRegistry.SignOut,
-            BackColor = UiTheme.BgLight, ForeColor = UiTheme.TextDark,
+            BackColor = UiTheme.Surface, ForeColor = UiTheme.TextDark,
             GlyphColor = UiTheme.Danger,
-            Width = 130, Height = 36,
+            BorderThickness = 1, BorderTint = UiTheme.BorderStrong,
+            Width = 152, Height = 38,
             Anchor = AnchorStyles.Right | AnchorStyles.Top
         };
         btnLogout.Click += (_, _) =>
@@ -136,6 +137,7 @@ public class BNForm : Form
         header.Controls.Add(roleChip);
         header.Controls.Add(btnLogout);
         header.Controls.Add(lblTitle);
+        header.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = UiTheme.Border });
         layout();
         return header;
     }
@@ -526,18 +528,18 @@ public class BNForm : Form
         Padding = new Padding(0, 5, 0, 2)
     };
 
-    private static TextBox EditBox(int width) => new()
+    private static TextBox EditBox(int width) => UiTheme.Pad(new()
     {
-        Width = width, Height = 30, Font = UiTheme.Body(),
+        Width = width, Height = 34, Font = UiTheme.Body(),
         BorderStyle = BorderStyle.FixedSingle
-    };
+    });
 
-    private static TextBox MemoBox(int width, int height) => new()
+    private static TextBox MemoBox(int width, int height) => UiTheme.Pad(new()
     {
         Width = width, Height = height, Multiline = true,
         ScrollBars = ScrollBars.Vertical, Font = UiTheme.Body(),
         BorderStyle = BorderStyle.FixedSingle
-    };
+    });
 
     private void TryCatch(Action a, [System.Runtime.CompilerServices.CallerMemberName] string caller = "")
     {

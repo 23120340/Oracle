@@ -159,14 +159,14 @@ public class DPVForm : Form
     {
         var header = new Panel
         {
-            Dock = DockStyle.Top, Height = 60,
+            Dock = DockStyle.Top, Height = 64,
             BackColor = UiTheme.Surface,
             Padding = new Padding(24, 12, 24, 12)
         };
         var lblTitle = new Label
         {
-            Text = title, Dock = DockStyle.Left, Width = 300,
-            Font = UiTheme.Heading2(), ForeColor = UiTheme.TextDark,
+            Text = title, Dock = DockStyle.Left, Width = 320,
+            Font = UiTheme.Heading1(16f), ForeColor = UiTheme.TextDark,
             TextAlign = ContentAlignment.MiddleLeft,
             AutoEllipsis = true
         };
@@ -178,9 +178,10 @@ public class DPVForm : Form
         var btnLogout = new RoundedButton
         {
             Text = "Đăng xuất", Glyph = IconRegistry.SignOut,
-            BackColor = UiTheme.BgLight, ForeColor = UiTheme.TextDark,
+            BackColor = UiTheme.Surface, ForeColor = UiTheme.TextDark,
             GlyphColor = UiTheme.Danger,
-            Width = 130, Height = 36,
+            BorderThickness = 1, BorderTint = UiTheme.BorderStrong,
+            Width = 152, Height = 38,
             Anchor = AnchorStyles.Right | AnchorStyles.Top
         };
         btnLogout.Click += (_, _) =>
@@ -202,6 +203,8 @@ public class DPVForm : Form
         header.Controls.Add(roleChip);
         header.Controls.Add(btnLogout);
         header.Controls.Add(lblTitle);
+        // Viền hairline đáy header (thêm cuối → dock trước → trải hết bề ngang)
+        header.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = UiTheme.Border });
         layout();
         return header;
     }
@@ -224,7 +227,7 @@ public class DPVForm : Form
             Margin = Padding.Empty
         };
         split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        split.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 360));
+        split.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 420));
         split.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         // ── Trái: toolbar + danh sách (mỗi phần một ô riêng) ──────────────────
@@ -302,7 +305,7 @@ public class DPVForm : Form
             form.Controls.Add(c, 0, r++);
         }
 
-        var titleBN = BoldLabel("Thông tin Bệnh nhân");
+        var titleBN = BoldLabel("Thông tin bệnh nhân");
         titleBN.Margin = new Padding(0, 0, 0, UiTheme.Spacing2);
         form.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         form.Controls.Add(titleBN, 0, r++);
@@ -318,8 +321,13 @@ public class DPVForm : Form
         AddInputRow(_cmbPhai, 28);
 
         AddLabelRow(Lbl("Ngày sinh:"));
-        _dtpNgaySinh = new DateTimePicker { Format = DateTimePickerFormat.Short, Font = UiTheme.Body() };
-        AddInputRow(_dtpNgaySinh, 28);
+        _dtpNgaySinh = new DateTimePicker
+        {
+            Format = DateTimePickerFormat.Custom,
+            CustomFormat = "   dd / MM / yyyy",   // FIX: thêm khoảng trống trái → số ngày không bị viền che
+            Font = UiTheme.Body()
+        };
+        AddInputRow(_dtpNgaySinh, 30);
 
         AddLabelRow(Lbl("CCCD:"));
         _txtCCCD  = TB(200); AddInputRow(_txtCCCD);
@@ -477,12 +485,18 @@ public class DPVForm : Form
     // ═══════════════════════════════════════════════════════════════════════════
     private TabPage BuildHSBATab()
     {
-        var page = new TabPage("Hồ sơ bệnh án");
-        var split = new SplitContainer
+        var page = new TabPage("Hồ sơ bệnh án") { BackColor = UiTheme.BgLight };
+        // FIX: thay SplitContainer (SplitterDistance không ổn định → cụm thẻ dưới bị ép ngắn,
+        // cắt mất combo "Bác sĩ" và lưới Dịch vụ) bằng TableLayoutPanel: danh sách trên co giãn
+        // (Percent), cụm thẻ dưới cao CỐ ĐỊNH 312px → luôn hiển thị đủ 3 combo + nút + lưới DV.
+        var outer = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill, Orientation = Orientation.Horizontal,
-            SplitterDistance = 260, IsSplitterFixed = false
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
+            Margin = Padding.Empty, Padding = Padding.Empty, BackColor = UiTheme.BgLight
         };
+        outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 312));
 
         // ── Top: danh sách HSBA + toolbar ─────────────────────────────────────
         _dgvHSBA = MakeGrid();
@@ -515,7 +529,8 @@ public class DPVForm : Form
         _dgvHSBA.Margin = Padding.Empty;
         hsbaTopLayout.Controls.Add(topBar, 0, 0);
         hsbaTopLayout.Controls.Add(_dgvHSBA, 0, 1);
-        split.Panel1.Controls.Add(hsbaTopLayout);
+        hsbaTopLayout.Margin = Padding.Empty;
+        outer.Controls.Add(hsbaTopLayout, 0, 0);
 
         // ── Bottom: 2 cột — tạo/điều phối (trái) + dịch vụ (phải) ────────────
         var bot = new TableLayoutPanel
@@ -527,9 +542,9 @@ public class DPVForm : Form
         bot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55));
 
         // ── Card trái: Tạo HSBA mới / Điều phối ──────────────────────────────
-        var coordCard = new Panel
+        var coordCard = new Card
         {
-            Dock = DockStyle.Fill, BackColor = UiTheme.Surface,
+            Dock = DockStyle.Fill,
             Padding = new Padding(18, 14, 18, 14),
             Margin = new Padding(0, 0, 8, 0)
         };
@@ -551,8 +566,8 @@ public class DPVForm : Form
             BackColor = UiTheme.Surface
         };
         coordLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));   // tiêu đề
-        coordLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));        // FIX: 3 combo — AutoSize để KHÔNG bị ép nhỏ / cắt hàng Bác sĩ
-        coordLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));   // FIX: hàng nút riêng, đủ cao cho nút + padding
+        coordLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 150));  // FIX: 3 combo cao CỐ ĐỊNH (AutoSize+Dock=Fill bị co lại → mất combo Bác sĩ)
+        coordLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));   // hàng nút riêng
         coordLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         coordLayout.Controls.Add(coordTitle, 0, 0);
 
@@ -629,23 +644,26 @@ public class DPVForm : Form
         bot.Controls.Add(coordCard, 0, 0);
 
         // ── Card phải: Dịch vụ chẩn đoán ─────────────────────────────────────
-        var dvCard = new Panel
+        var dvCard = new Card
         {
-            Dock = DockStyle.Fill, BackColor = UiTheme.Surface,
+            Dock = DockStyle.Fill,
             Padding = new Padding(18, 14, 18, 14),
             Margin = new Padding(8, 0, 0, 0)
         };
+        // FIX: nhãn + lưới + nút mỗi thứ một HÀNG riêng trong TableLayoutPanel
+        // (trước đây Label Dock=Top + dvLayout Dock=Fill thêm sau → Fill đè lên, che lưới DV).
         _lblHSBAInfo = new Label
         {
-            Dock = DockStyle.Top, Height = 28,
+            Dock = DockStyle.Fill,
             Font = UiTheme.LabelBold(11f),
             ForeColor = UiTheme.TextDark,
-            Text = "Dịch vụ chẩn đoán (chọn HSBA bên trên)"
+            TextAlign = ContentAlignment.MiddleLeft,
+            Text = "Dịch vụ chẩn đoán (chọn HSBA bên trên)",
+            Margin = Padding.Empty
         };
-        dvCard.Controls.Add(_lblHSBAInfo);
 
-        var dvBottom = new Panel { Dock = DockStyle.Bottom, Height = 44, BackColor = UiTheme.Surface };
-        _btnAssignKTV = Btn("Giao KTV cho dịch vụ", UiTheme.HealthGreen, width: 180);
+        var dvBottom = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, Margin = Padding.Empty };
+        _btnAssignKTV = Btn("Giao KTV cho dịch vụ", UiTheme.HealthGreen, width: 190);
         _btnAssignKTV.Dock = DockStyle.Right;
         _btnAssignKTV.Click += BtnAssignKTV_Click;
         dvBottom.Controls.Add(_btnAssignKTV);
@@ -657,23 +675,24 @@ public class DPVForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 2,
+            RowCount = 3,
             Margin = Padding.Empty,
             Padding = Padding.Empty
         };
-        dvLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        dvLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        dvLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));   // nhãn HSBA
+        dvLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));   // lưới dịch vụ
+        dvLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));   // nút giao KTV
         dvLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        dvBottom.Dock = DockStyle.Fill;
-        dvBottom.Margin = Padding.Empty;
-        dvLayout.Controls.Add(_dgvDV, 0, 0);
-        dvLayout.Controls.Add(dvBottom, 0, 1);
+        dvLayout.Controls.Add(_lblHSBAInfo, 0, 0);
+        dvLayout.Controls.Add(_dgvDV, 0, 1);
+        dvLayout.Controls.Add(dvBottom, 0, 2);
         dvCard.Controls.Add(dvLayout);
 
         bot.Controls.Add(dvCard, 1, 0);
 
-        split.Panel2.Controls.Add(bot);
-        page.Controls.Add(split);
+        bot.Margin = Padding.Empty;
+        outer.Controls.Add(bot, 0, 1);
+        page.Controls.Add(outer);
         page.Enter += (_, _) => { LoadHSBA(); LoadBSList(); LoadBNList(); };
         return page;
     }
@@ -903,11 +922,11 @@ public class DPVForm : Form
 
     private static Label BoldLabel(string text) =>
         new() { Text = text, AutoSize = true, Font = UiTheme.Heading3(),
-                ForeColor = Color.FromArgb(180, 100, 0), Padding = new Padding(0, 4, 0, 4) };
+                ForeColor = UiTheme.TextDark, Padding = new Padding(0, 4, 0, 4) };
 
     private static TextBox TB(int width) =>
-        new() { Width = width, Height = 28, Font = UiTheme.Body(),
-                Margin = new Padding(0, 0, 0, 10) };     // FIX: khoảng cách xuống label kế tiếp
+        UiTheme.Pad(new() { Width = width, Height = 32, Font = UiTheme.Body(),
+                Margin = new Padding(0, 0, 0, 10) });     // Pad: chữ không dính sát viền; cao 32 cho 10pt
 
     private static Button Btn(string text, Color color, int width = 130,
                               EventHandler? onClick = null)
