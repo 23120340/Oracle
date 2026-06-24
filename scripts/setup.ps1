@@ -11,6 +11,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$env:NLS_LANG = ".AL32UTF8"   # FIX: đảm bảo sqlplus đọc/gửi UTF-8 (tiếng Việt không bị hỏng dấu)
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 
 function Invoke-SqlScript {
@@ -18,7 +19,8 @@ function Invoke-SqlScript {
         [string]$User,
         [string]$Password,
         [string]$ScriptPath,
-        [switch]$AsSysDba
+        [switch]$AsSysDba,
+        [string]$Schema          # nếu set: prepend ALTER SESSION SET CURRENT_SCHEMA (cho file không có CONNECT)
     )
 
     $safePassword = $Password.Replace('"', '\"')
@@ -30,7 +32,8 @@ function Invoke-SqlScript {
     $fullPath = Join-Path $RepoRoot $ScriptPath
     $connectId = "$HostName`:$Port/$Sid"
     $tempPath = Join-Path ([System.IO.Path]::GetTempPath()) ("oracle_setup_" + [System.IO.Path]::GetFileName($ScriptPath))
-    $scriptText = Get-Content -LiteralPath $fullPath -Raw
+    # FIX: đọc UTF-8 (tự nhận BOM) — tránh Get-Content (PS5.1) đọc nhầm ANSI làm hỏng tiếng Việt
+    $scriptText = [System.IO.File]::ReadAllText($fullPath)
     $lines = $scriptText -split "\r?\n"
     $scriptText = ($lines | ForEach-Object {
         if ($_ -match '^(?<prefix>\s*CONNECT\s+)(?<credential>\S+)(?<as>\s+AS\s+SYSDBA)?(?<semi>;?)\s*$') {
@@ -54,8 +57,15 @@ function Invoke-SqlScript {
             $_
         }
     }) -join [Environment]::NewLine
+    if ($Schema) {
+        # Các file 11/13/setup_all không có CONNECT nội bộ → cần đặt schema BVADMIN tường minh
+        $scriptText = "ALTER SESSION SET CURRENT_SCHEMA = $Schema;" + [Environment]::NewLine + $scriptText
+    }
+    # FIX: tắt thay thế biến '&' cho MỌI script → tránh prompt "Enter value for ..." khi comment/chuỗi có '&'
+    $scriptText = "SET DEFINE OFF" + [Environment]::NewLine + $scriptText
     $scriptText = $scriptText + [Environment]::NewLine + "EXIT" + [Environment]::NewLine
-    Set-Content -LiteralPath $tempPath -Value $scriptText -NoNewline
+    # FIX: ghi UTF-8 KHÔNG BOM — Set-Content (PS5.1) mặc định ANSI/Windows-1252 sẽ làm hỏng tiếng Việt
+    [System.IO.File]::WriteAllText($tempPath, $scriptText, (New-Object System.Text.UTF8Encoding($false)))
 
     Write-Host "Running $ScriptPath ..." -ForegroundColor Cyan
     sqlplus -L $connect "@$tempPath"
@@ -103,7 +113,7 @@ END;
 EXIT
 "@
     $tempPath = Join-Path ([System.IO.Path]::GetTempPath()) "oracle_setup_reset.sql"
-    Set-Content -LiteralPath $tempPath -Value $resetSql -NoNewline
+    [System.IO.File]::WriteAllText($tempPath, $resetSql, (New-Object System.Text.UTF8Encoding($false)))
     Write-Host "Resetting demo users/roles ..." -ForegroundColor Yellow
     sqlplus -L $connect "@$tempPath"
     if ($LASTEXITCODE -ne 0) {
@@ -145,6 +155,18 @@ else {
 foreach ($script in $scripts) {
     Invoke-SqlScript -User "sys" -Password $SysPass -ScriptPath $script -AsSysDba
 }
+
+# View tra cứu + grant tổng hợp — chạy trong schema BVADMIN (các file này không có CONNECT nội bộ)
+foreach ($g in @(
+        "PhanHe2\11_NV_Lookup_Grants.sql",
+        "PhanHe2\13_Audit_Grants.sql",
+        "PhanHe2\setup_all.sql"
+    )) {
+    Invoke-SqlScript -User "sys" -Password $SysPass -ScriptPath $g -AsSysDba -Schema "BVADMIN"
+}
+
+# Tài khoản DBA cho AdminDashboard (Phân hệ 1)
+Invoke-SqlScript -User "sys" -Password $SysPass -ScriptPath "PhanHe2\setup_admin_user.sql" -AsSysDba
 
 if (-not $SkipRecoveryDemo) {
     Invoke-SqlScript -User "sys" -Password $SysPass -ScriptPath "PhanHe2\09_Recovery_Demo.sql" -AsSysDba

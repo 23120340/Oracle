@@ -14,9 +14,14 @@
 --
 -- Windows CMD:   set NLS_LANG=.AL32UTF8
 -- PowerShell:    $env:NLS_LANG = ".AL32UTF8"
+--
+-- Chạy với user BVADMIN (chủ schema):
+--   sqlplus BVADMIN/<BVADMIN_pass>@//localhost:1521/XEPDB1
+--   SQL> @12_Fix_UTF8_Data.sql
 -- ============================================================
-
-CONNECT BVADMIN/BVAdmin@2025;
+-- KHÔNG dùng CONNECT — script chạy với session hiện tại
+SET DEFINE OFF
+-- (tránh SQL*Plus hiểu '&' trong dữ liệu là biến thay thế; KHÔNG đặt ';' sau SET)
 
 -- ── NHANVIEN ────────────────────────────────────────────────────────────────
 UPDATE NHANVIEN SET HOTEN=N'Nguyễn Văn An',  QUEQUAN=N'TP. Hồ Chí Minh',     CHUYENKHOA=N'Tiếp nhận'         WHERE MANV='NV001';
@@ -30,31 +35,34 @@ COMMIT;
 
 -- ── BENHNHAN ────────────────────────────────────────────────────────────────
 UPDATE BENHNHAN SET
-    TENBN      = N'Mai Thị Hoa',
-    SONHA      = N'12',
-    TENDUONG   = N'Lê Lợi',
-    QUANHUYEN  = N'Quận 1',
-    TINHTP     = N'TP. Hồ Chí Minh',
-    TIENSUBENH = N'Tiểu đường type 2',
-    DIUNGTHUOC = N'Penicillin'
+    TENBN        = N'Mai Thị Hoa',
+    SONHA        = N'12',
+    TENDUONG     = N'Lê Lợi',
+    QUANHUYEN    = N'Quận 1',
+    TINHTP       = N'TP. Hồ Chí Minh',
+    TIENSUBENH   = N'Tiểu đường type 2',
+    TIENSUBENHGD = N'Mẹ và chị gái bị tiểu đường type 2',
+    DIUNGTHUOC   = N'Penicillin'
 WHERE MABN='BN001';
 
 UPDATE BENHNHAN SET
-    TENBN      = N'Nguyễn Văn Bình',
-    SONHA      = N'5A',
-    TENDUONG   = N'Trần Hưng Đạo',
-    QUANHUYEN  = N'Quận 5',
-    TINHTP     = N'TP. Hồ Chí Minh',
-    TIENSUBENH = N'Không'
+    TENBN        = N'Nguyễn Văn Bình',
+    SONHA        = N'5A',
+    TENDUONG     = N'Trần Hưng Đạo',
+    QUANHUYEN    = N'Quận 5',
+    TINHTP       = N'TP. Hồ Chí Minh',
+    TIENSUBENH   = N'Không',
+    TIENSUBENHGD = N'Cha bị cao huyết áp'
 WHERE MABN='BN002';
 
 UPDATE BENHNHAN SET
-    TENBN      = N'Trần Thị Cẩm',
-    SONHA      = N'88',
-    TENDUONG   = N'Hoàng Diệu',
-    QUANHUYEN  = N'Hải Châu',
-    TINHTP     = N'Đà Nẵng',
-    TIENSUBENH = N'Hen suyễn'
+    TENBN        = N'Trần Thị Cẩm',
+    SONHA        = N'88',
+    TENDUONG     = N'Hoàng Diệu',
+    QUANHUYEN    = N'Hải Châu',
+    TINHTP       = N'Đà Nẵng',
+    TIENSUBENH   = N'Hen suyễn',
+    TIENSUBENHGD = N'Gia đình có tiền sử hen phế quản'
 WHERE MABN='BN003';
 COMMIT;
 
@@ -86,19 +94,21 @@ WHERE MAHSBA='HS004';
 COMMIT;
 
 -- ── HSBA_DV ─────────────────────────────────────────────────────────────────
+-- FIX (H3): KHÔNG dùng LOAIDV (cột PK) trong WHERE để tự sửa chính nó (mong manh + dễ trùng PK).
+-- Định danh dòng bằng (MAHSBA, NGAYDV) — bộ giá trị duy nhất với dữ liệu mẫu.
 UPDATE HSBA_DV SET LOAIDV=N'Xét nghiệm máu tổng quát',
     KETQUA=N'Glucose: 12.5 mmol/L, HbA1c: 9%'
-WHERE MAHSBA='HS001' AND LOAIDV LIKE '%t nghi%';
+WHERE MAHSBA='HS001' AND NGAYDV=DATE'2025-04-01';
 
 UPDATE HSBA_DV SET LOAIDV=N'Siêu âm tim',
     KETQUA=N'Tim bình thường, EF 65%'
-WHERE MAHSBA='HS001' AND LOAIDV LIKE '%i%u %m%';
+WHERE MAHSBA='HS001' AND NGAYDV=DATE'2025-04-02';
 
 UPDATE HSBA_DV SET LOAIDV=N'Điện não đồ'
-WHERE MAHSBA='HS002';
+WHERE MAHSBA='HS002' AND NGAYDV=DATE'2025-04-05';
 
 UPDATE HSBA_DV SET LOAIDV=N'Đo chức năng hô hấp'
-WHERE MAHSBA='HS003';
+WHERE MAHSBA='HS003' AND NGAYDV=DATE'2025-04-10';
 COMMIT;
 
 -- ── DONTHUOC ────────────────────────────────────────────────────────────────
@@ -126,7 +136,8 @@ UPDATE THONGBAO SET NOIDUNG=N'Họp khẩn Lãnh đạo Khoa TH và TK - Cơ s�
 COMMIT;
 
 -- ── Verify ─────────────────────────────────────────────────────────────────
-SELECT 'NHANVIEN' AS TBL, COUNT(*) FROM NHANVIEN WHERE HOTEN LIKE '%ễ%' OR HOTEN LIKE '%ư%'
+-- FIX (L6): dùng tiền tố N cho literal để khớp NVARCHAR2 (HOTEN/TENBN), tránh âm tính giả.
+SELECT 'NHANVIEN' AS TBL, COUNT(*) FROM NHANVIEN WHERE HOTEN LIKE N'%ễ%' OR HOTEN LIKE N'%ư%'
 UNION ALL
-SELECT 'BENHNHAN', COUNT(*) FROM BENHNHAN WHERE TENBN LIKE '%ị%' OR TENBN LIKE '%ễ%';
+SELECT 'BENHNHAN', COUNT(*) FROM BENHNHAN WHERE TENBN LIKE N'%ị%' OR TENBN LIKE N'%ễ%';
 -- Nếu COUNT > 0 → Vietnamese diacritics đã decode đúng.

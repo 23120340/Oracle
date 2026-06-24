@@ -1,4 +1,4 @@
-namespace HospitalApp.Security;
+﻿namespace HospitalApp.Security;
 
 /// <summary>
 /// Logging app-side (bổ sung cho DB audit của Yêu cầu 3).

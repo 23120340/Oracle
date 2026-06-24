@@ -1,250 +1,355 @@
 # Đồ án CSC12001 – An toàn và Bảo mật Dữ liệu trong HTTT
 
-> **Môn học:** CSC12001 – An toàn và Bảo mật Dữ liệu trong Hệ thống Thông tin  
-> **Năm học:** 2025 – 2026  
-> **Trường:** Trường Đại học Khoa học Tự nhiên – Khoa Công nghệ Thông tin  
+> **Môn học:** CSC12001 – An toàn và Bảo mật Dữ liệu trong Hệ thống Thông tin
+> **Năm học:** 2025 – 2026
+> **Trường:** Trường Đại học Khoa học Tự nhiên – Khoa Công nghệ Thông tin
 > **Giảng viên:** TS. Phạm Thị Bạch Huệ · ThS. Lương Vĩ Minh · ThS. Tiết Gia Hồng
+
+Đồ án gồm **2 phân hệ trong cùng một ứng dụng WinForms**:
+- **Phân hệ 1** – Ứng dụng quản trị CSDL Oracle (cho DBA).
+- **Phân hệ 2** – Ứng dụng quản lý dữ liệu y tế (RBAC, VPD, OLS, Audit, Backup/Recovery).
 
 ---
 
-## Nội dung repo
+## 1. Cấu trúc repo
 
 ```
 Oracle/
-├── HospitalApp/           ← Source WinForms C# (Phân hệ 1 + 2)
-├── PhanHe2/               ← Script Oracle SQL (Phân hệ 2)
-│   ├── 01_schema_data.sql
-│   ├── 02_TC1_accounts.sql
-│   ├── 03_YC1_C2_RBAC_KTV_BN.sql
-│   ├── 04_YC1_C3_VPD_DPV_BS.sql
-│   ├── 05_YC2_OLS_ThongBao.sql
-│   ├── 06_YC3_Audit.sql
-│   ├── 07_YC4_Backup_Recovery.sql
-│   ├── 08_App_Migrations.sql
-│   ├── 09_OLS_NhanVien_Unified.sql
-│   └── 09_Recovery_Demo.sql
-├── scripts/
-│   └── setup.ps1          ← Runner SQL*Plus
+├── HospitalApp/                 ← Source WinForms C# (.NET 8) — Phân hệ 1 + 2
+│   ├── HospitalApp.csproj
+│   ├── Program.cs
+│   ├── Database/OracleHelper.cs
+│   ├── Forms/                   ← LoginForm, Admin/AdminDashboard, Hospital/{DPV,BS,KTV,BN,OLSViewer}Form
+│   ├── Controls/                ← Sidebar, Card, StatusBar, Toast, SearchBox, MyProfilePanel, …
+│   ├── Security/                ← OracleErrorMapper, InputValidator, SessionManager, AppAuditLogger
+│   ├── Theme/                   ← UiTheme (Montserrat), IconRegistry, Animator
+│   └── Resources/Fonts/         ← Montserrat-Regular.ttf, Montserrat-Bold.ttf (đã nhúng)
+│
+├── PhanHe2/                     ← Script Oracle SQL (Phân hệ 2)
+│   ├── 00_UTF8_SETUP.md         ← ⚠ ĐỌC TRƯỚC: cấu hình UTF-8 cho tiếng Việt
+│   ├── 01_schema_data.sql       ← Tạo BVADMIN + bảng + dữ liệu mẫu
+│   ├── 02_TC1_accounts.sql      ← Tạo Oracle account cho NV/BN (TC#1)
+│   ├── 03_YC1_C2_RBAC_KTV_BN.sql← RBAC: view + INSTEAD OF trigger cho KTV & Bệnh nhân
+│   ├── 04_YC1_C3_VPD_DPV_BS.sql ← VPD: policy + trigger ghi vết cho ĐPV & Bác sĩ
+│   ├── 05_YC2_OLS_ThongBao.sql  ← OLS: nhãn 3 thành phần cho THONGBAO (cần LBACSYS)
+│   ├── 06_YC3_Audit.sql         ← Standard Audit (5 ngữ cảnh) + FGA (4 tình huống)
+│   ├── 07_YC4_Backup_Recovery.sql← RMAN / Data Pump / Flashback
+│   ├── 08_App_Migrations.sql    ← Sequence, APP_LOGIN_LOG, proc tạo BN
+│   ├── 09_OLS_NhanVien_Unified.sql ← Cột CAPBAC/COSO/KHOA_NHAN + gán nhãn OLS nhân viên + NV_NHANVIEN_View
+│   ├── 09_Recovery_Demo.sql     ← Demo phục hồi Flashback (chạy khi vấn đáp)
+│   ├── 10_XE_App_Demo_Fix.sql   ← Sửa account mapping cho Oracle XE
+│   ├── 11_NV_Lookup_Grants.sql  ← NV_LOOKUP_View (DPV/BS tra cứu nhân viên)
+│   ├── 12_Fix_UTF8_Data.sql     ← Sửa dữ liệu tiếng Việt nếu bị lệch encoding
+│   ├── 13_Audit_Grants.sql      ← Grant SELECT các bảng log
+│   ├── setup_all.sql            ← Tổng hợp view + grant (chạy SAU CÙNG, bằng BVADMIN)
+│   ├── setup_admin_user.sql     ← Tạo HOSPITAL_DBA (tài khoản vào AdminDashboard)
+│   ├── fix_fga_ora28138.sql     ← Hotfix ORA-28138 (FGA predicate đơn) — chạy bằng BVADMIN, không cần -Reset
+│   ├── run_migrations.ps1       ← Runner chạy 01→13 + setup_all
+│   └── REVIEW_LOI_PHANHE2.md    ← Báo cáo rà soát lỗi + trạng thái sửa (checklist)
+│
+├── scripts/setup.ps1            ← Runner nhanh (01→10 bằng SYS)
 ├── docs/
-│   ├── assignment/        ← Đề bài gốc
-│   ├── guides/            ← Demo, encryption, vấn đáp
-│   ├── reports/           ← Draft báo cáo và review cuối
-│   └── planning/          ← Kế hoạch nội bộ
-└── dist/
-    └── win-x64/           ← Bản publish chạy thử
+│   ├── assignment/              ← Đề bài gốc (PDF)
+│   ├── guides/                  ← DEMO_SCRIPT, SETUP_ENCRYPTION, TALKING_POINTS
+│   ├── reports/                 ← REPORT_DRAFT, FINAL_REVIEW
+│   └── planning/                ← PLAN_REMAINING
+└── dist/                        ← Bản publish (win-x64, win-x64-fixed)
 ```
 
 ---
 
-## Phân hệ 1 – Ứng dụng Quản trị CSDL Oracle
+## 2. Yêu cầu môi trường
 
-Ứng dụng **WinForm** dành cho DBA, cho phép quản trị toàn bộ hệ thống Oracle DB:
+| Thành phần | Yêu cầu |
+|------------|---------|
+| Oracle Database | **Oracle XE 21c** (khuyên dùng) hoặc 19c+ |
+| Oracle Label Security (OLS) | **Bắt buộc cho Yêu cầu 2** — phải được cài (xem §4) |
+| Character set DB | **AL32UTF8** (mặc định của XE 21c) — cần cho tiếng Việt |
+| .NET SDK | **.NET 8 SDK (Windows)** |
+| NuGet | `Oracle.ManagedDataAccess.Core 23.4.0` (tự restore) |
+| Công cụ chạy SQL | **SQL\*Plus** hoặc **SQLcl** (khuyên dùng vì hỗ trợ UTF-8 BOM sẵn) |
 
-| Tính năng | Mô tả |
-|-----------|-------|
-| Quản lý User | Tạo, xóa, khóa/mở khóa tài khoản Oracle |
-| Quản lý Role | Tạo, xóa role |
-| Cấp quyền | Grant quyền hệ thống, đối tượng (table/view/procedure/function), cấp role cho user; hỗ trợ phân quyền đến mức cột cho SELECT/UPDATE; tùy chọn WITH GRANT OPTION |
-| Thu hồi quyền | Revoke quyền hệ thống, đối tượng, role |
-| Xem quyền | Hiển thị toàn bộ system/object/column/role privilege của user hoặc role |
+> ⚠️ **Mật khẩu trong script là giả định** — phải khớp DB của bạn hoặc sửa lại trước khi chạy:
+> `SYS/<your_sys_pwd>`, `SYSTEM/oracle`, `LBACSYS/lbacsys`, `BVADMIN/"BVAdmin@2025"`.
+> Các file 06/07/10 dùng biến thay thế `&&sys_pwd` → SQL\*Plus sẽ **hỏi mật khẩu SYS một lần**.
 
 ---
 
-## Phân hệ 2 – Ứng dụng Quản lý Dữ liệu Y tế
+## 3. ⚠️ Bước BẮT BUỘC trước khi chạy: bật UTF-8 (tiếng Việt)
 
-Hệ thống quản lý bệnh viện với cơ sở dữ liệu Oracle, áp dụng đầy đủ các cơ chế bảo mật.
+Nếu **không** đặt `NLS_LANG` đúng trước khi chạy script chứa tiếng Việt, dữ liệu sẽ bị lưu sai byte → hiển thị `???` hoặc lỗi dấu. Đặt **trước khi mở** SQL\*Plus:
 
-### Schema cơ sở dữ liệu
+```powershell
+# PowerShell
+$env:NLS_LANG = ".AL32UTF8"
+```
+```cmd
+:: CMD
+set NLS_LANG=.AL32UTF8
+```
+
+Kiểm tra character set của DB (phải là `AL32UTF8`):
+
+```sql
+SELECT VALUE FROM NLS_DATABASE_PARAMETERS WHERE PARAMETER = 'NLS_CHARACTERSET';
+```
+
+Chi tiết: [PhanHe2/00_UTF8_SETUP.md](PhanHe2/00_UTF8_SETUP.md).
+
+---
+
+## 4. Cài đặt Oracle Label Security (chỉ cho Yêu cầu 2)
+
+OLS cần được cài và tài khoản `LBACSYS` được mở khoá. Trên XE/CDB-PDB:
+
+```sql
+-- Kết nối SYS AS SYSDBA, tới đúng PDB (vd XEPDB1)
+ALTER SESSION SET CONTAINER = XEPDB1;          -- nếu là PDB
+-- Cài OLS nếu chưa có:
+@?/rdbms/admin/catols.sql
+-- Mở khoá + đặt mật khẩu LBACSYS:
+ALTER USER LBACSYS IDENTIFIED BY lbacsys ACCOUNT UNLOCK;
+```
+
+Kiểm tra OLS đã bật:
+
+```sql
+SELECT VALUE FROM V$OPTION WHERE PARAMETER = 'Oracle Label Security';  -- TRUE
+```
+
+> Nếu không cài OLS, các file 01–04, 06–13 vẫn chạy được; chỉ riêng **Yêu cầu 2 (file 05)** sẽ lỗi.
+
+---
+
+## 5. Khởi tạo CSDL — các bước chạy đầy đủ
+
+### ✅ Cách 1 (KHUYÊN DÙNG) — một lệnh `scripts/setup.ps1`
+
+Runner này nối **một lần** vào XEPDB1 bằng SYS, tự xử lý đúng container (CDB/PDB), tự đặt
+`NLS_LANG=.AL32UTF8` và ghi file tạm **UTF-8** (tiếng Việt không hỏng dấu). Nó chạy **toàn bộ**:
+`01 → 10`, rồi `11/13/setup_all` (trong schema BVADMIN), `setup_admin_user`, và demo phục hồi.
+
+```powershell
+cd D:\repos\Oracle
+# Lần đầu hoặc chạy lại: thêm -Reset để DROP sạch user/role demo cũ trước (tránh ORA-01920/00955)
+.\scripts\setup.ps1 -HostName localhost -Port 1521 -Sid XEPDB1 -SysPass "<mat_khau_SYS>" -Reset
+```
+
+Tham số: `-AppOnly` (bỏ audit/backup), `-SkipRecoveryDemo` (bỏ demo phục hồi),
+`-BvAdminPass`, `-LbacsysPass`.
+
+> ⚠️ **Phải dùng `-Reset` khi chạy lại** — nếu DB đã có `BVADMIN`/role từ lần trước, chạy lại
+> không `-Reset` sẽ báo `ORA-01920`/`ORA-00955`/`ORA-00947`.
+> Yêu cầu 2 (OLS, file 05) cần đã cài Oracle Label Security trong XEPDB1 — xem §4 (nếu chưa cài,
+> runner vẫn chạy tiếp các phần khác, chỉ OLS không thiết lập được).
+
+### Cách 2 — thủ công bằng SQL\*Plus (khi cần kiểm soát từng bước)
+
+> Trên Oracle **XE (CDB/PDB)**: các lệnh `CONNECT user/pass` **không kèm service** bên trong file
+> 01–10 sẽ nhảy về `CDB$ROOT` (sai container) → **nên dùng Cách 1** cho nhóm file này.
+> Các file 11/12/13/setup_all/setup_admin_user **không có CONNECT** nên chạy thủ công tốt:
+
+```powershell
+$env:NLS_LANG = ".AL32UTF8"
+```
+
+**Pha B — kết nối BVADMIN** (view tra cứu + grant):
+```powershell
+sqlplus 'BVADMIN/"BVAdmin@2025"@//localhost:1521/XEPDB1'
+```
+```sql
+@PhanHe2/11_NV_Lookup_Grants.sql   -- NV_LOOKUP_View cho DPV/BS
+@PhanHe2/13_Audit_Grants.sql       -- grant SELECT bảng log
+@PhanHe2/setup_all.sql             -- tổng hợp view + grant cuối cùng
+@PhanHe2/12_Fix_UTF8_Data.sql      -- (chỉ khi) dữ liệu Việt mẫu bị lệch dấu
+EXIT
+```
+
+**Pha C — kết nối SYS** (tài khoản DBA cho AdminDashboard):
+```powershell
+sqlplus 'SYS/<mat_khau_SYS>@//localhost:1521/XEPDB1 AS SYSDBA'
+```
+```sql
+@PhanHe2/setup_admin_user.sql      -- tạo HOSPITAL_DBA / Hospital@DBA2025
+EXIT
+```
+
+> `PhanHe2/run_migrations.ps1` là một runner khác (01→13 + setup_all) nhưng **phụ thuộc mật khẩu
+> CONNECT cố định trong file** — kém tin cậy hơn `setup.ps1`; chỉ dùng nếu bạn đã sửa mật khẩu cho khớp.
+
+---
+
+## 6. Build & chạy ứng dụng
+
+```powershell
+cd HospitalApp
+dotnet restore
+dotnet run            # hoặc: dotnet build -c Release
+```
+
+Bản publish sẵn có trong `dist/win-x64-fixed/HospitalApp.exe`.
+
+### Đăng nhập
+
+Màn hình đăng nhập → bấm **Tùy chọn nâng cao** để chỉnh Host/Port/Service:
+
+```text
+Host: localhost      Port: 1521      Service: XEPDB1
+```
+
+App tự nhận diện vai trò (qua `BVADMIN.NHANVIEN/BENHNHAN`, nhãn OLS, hoặc tiền tố tên) và mở đúng giao diện:
+
+| Tài khoản | Mật khẩu | Vai trò | Giao diện |
+|-----------|----------|---------|-----------|
+| `HOSPITAL_DBA` | `Hospital@DBA2025` | DBA | AdminDashboard (Phân hệ 1) |
+| `SYSTEM` | *(mật khẩu DB)* | DBA | AdminDashboard (Phân hệ 1) |
+| `DPV_NV001` | `BV@2025!` | Điều phối viên | DPVForm |
+| `BS_NV003` | `BV@2025!` | Bác sĩ / Y sĩ | BSForm |
+| `KTV_NV006` | `BV@2025!` | Kỹ thuật viên | KTVForm |
+| `BN_BN001` | `BV@2025!` | Bệnh nhân | BNForm |
+| `u1_giamdoc` … `u8_nvth_hni` | `U1@2025` … `U8@2025` | OLS demo | OLSViewerForm |
+
+> ℹ️ **Đăng nhập bằng `SYSTEM`:** app kết nối SYSTEM như user thường (KHÔNG cần `AS SYSDBA`).
+> Nếu không vào được thì gần như chắc chắn là **sai mật khẩu hoặc sai Service**:
+> - Mật khẩu `oracle` trong các script chỉ là **giả định** — phải nhập đúng mật khẩu SYSTEM bạn đặt khi cài Oracle XE.
+> - Trong **Tùy chọn nâng cao**, Service phải trỏ đúng PDB chứa schema `BVADMIN` (mặc định `XEPDB1`). Nếu SYSTEM của bạn nằm ở service khác (vd `XE`), sửa lại cho khớp.
+> - Sai 5 lần liên tiếp sẽ bị app khoá tạm 60 giây — đợi hết khoá rồi thử lại.
+>
+> ✅ **Khuyến nghị:** dùng tài khoản DBA chuyên dụng `HOSPITAL_DBA / Hospital@DBA2025` (tạo bởi `PhanHe2/setup_admin_user.sql`) thay cho SYSTEM — mật khẩu cố định, không phụ thuộc môi trường cài đặt.
+
+---
+
+## 7. Phân hệ 1 – Ứng dụng Quản trị CSDL Oracle
+
+Giao diện **AdminDashboard** cho DBA:
+
+| Tính năng | Mô tả |
+|-----------|-------|
+| Quản lý User | Tạo, xoá, khoá/mở khoá tài khoản Oracle |
+| Quản lý Role | Tạo, xoá role |
+| Cấp quyền | Grant quyền hệ thống / đối tượng (table/view/procedure/function) / cấp role; phân quyền tới **mức cột** cho SELECT/UPDATE; tuỳ chọn **WITH GRANT OPTION** |
+| Thu hồi quyền | Revoke quyền hệ thống / đối tượng / cột / role |
+| Xem quyền | Liệt kê system/object/column/role privilege của user hoặc role |
+| Nhật ký audit | Xem `DBA_AUDIT_TRAIL` (7 ngày gần nhất) |
+
+---
+
+## 8. Phân hệ 2 – Ứng dụng Quản lý Dữ liệu Y tế
+
+### Lược đồ CSDL (schema owner = `BVADMIN`)
 
 | Bảng | Mô tả |
 |------|-------|
-| `BENHNHAN` | Thông tin bệnh nhân (có cột `ORACLE_USER` để ánh xạ tài khoản) |
-| `NHANVIEN` | Nhân viên bệnh viện – DPV, BS, KTV (có cột `ORACLE_USER`) |
+| `BENHNHAN` | Bệnh nhân — có cột `ORACLE_USER` ánh xạ tài khoản (TC#1) |
+| `NHANVIEN` | Nhân viên (DPV/BS/KTV) — có `ORACLE_USER`, `CAPBAC/COSO/KHOA_NHAN` (nhãn OLS) |
 | `HSBA` | Hồ sơ bệnh án |
 | `HSBA_DV` | Dịch vụ hỗ trợ chẩn đoán |
 | `DONTHUOC` | Đơn thuốc |
 | `THONGBAO` | Thông báo nội bộ (áp dụng OLS) |
 
-### Yêu cầu 1 – Cấp quyền truy cập (RBAC + VPD)
+> Các cột văn bản dài (CHANDOAN/DIEUTRI/KETLUAN/KETQUA/TIENSUBENH/TIENSUBENHGD) dùng **`NVARCHAR2(2000)`**
+> (Unicode) để so sánh `:OLD/:NEW` trong trigger ghi vết và tránh lỗi `ORA-00932`.
 
-**Câu 1 – TC#1:** DBA tạo Oracle account cho toàn bộ nhân viên và bệnh nhân. Tên tài khoản được lưu trực tiếp vào cột `ORACLE_USER` trong `NHANVIEN` / `BENHNHAN` → nhận diện người dùng chỉ cần truy vấn **1 bảng** (`SELECT * FROM NHANVIEN WHERE ORACLE_USER = SYS_CONTEXT(...)`).
+### Yêu cầu 1 — Cấp quyền truy cập
 
-**Câu 2 – RBAC** cho Kỹ thuật viên và Bệnh nhân:
+**TC#1:** DBA tạo Oracle account cho mọi nhân viên/bệnh nhân; lưu tên tài khoản vào cột `ORACLE_USER`
+→ nhận diện người dùng chỉ cần **1 bảng**: `WHERE ORACLE_USER = SYS_CONTEXT('USERENV','SESSION_USER')`.
+
+**Câu 2 — RBAC** (Kỹ thuật viên, Bệnh nhân):
 
 | Role | Cơ chế | Quyền |
 |------|--------|-------|
-| `KTV_Role` | View + INSTEAD OF Trigger | Chỉ xem `HSBA_DV` do mình thực hiện; UPDATE duy nhất cột `KETQUA` |
-| `BenhNhan_Role` | View + INSTEAD OF Trigger | Chỉ xem 1 dòng của mình trong `BENHNHAN`; UPDATE địa chỉ và tiền sử bệnh; không sửa được MABN/TENBN/PHAI/NGAYSINH/CCCD |
+| `KTV_Role` | View `KTV_HSBA_DV_View` + INSTEAD OF trigger | Chỉ xem `HSBA_DV` mình thực hiện (`MAKTV`=mình); UPDATE duy nhất `KETQUA` (có ghi vết) |
+| `BenhNhan_Role` | View `BN_BENHNHAN_View`/`BN_HSBA_View` + trigger | Chỉ xem dòng của mình; sửa địa chỉ + tiền sử bệnh; **không** sửa MABN/TENBN/PHAI/NGAYSINH/CCCD |
 
-**Câu 3 – VPD** cho Điều phối viên và Bác sĩ:
+**Câu 3 — VPD** (Điều phối viên, Bác sĩ):
 
 | Role | Bảng | Predicate VPD |
 |------|------|---------------|
-| `DPV_Role` | `HSBA`, `HSBA_DV`, `BENHNHAN` | `''` (xem tất cả, không filter dòng) |
+| `DPV_Role` | `HSBA`, `HSBA_DV`, `BENHNHAN` | rỗng (xem tất cả) |
 | `BS_Role` | `HSBA` | `MABS = fn_get_manv()` |
-| `BS_Role` | `HSBA_DV`, `DONTHUOC` | `MAHSBA IN (SELECT MAHSBA FROM HSBA WHERE MABS = fn_get_manv())` |
-| `BS_Role` | `BENHNHAN` | `MABN IN (SELECT MABN FROM HSBA WHERE MABS = fn_get_manv())` |
+| `BS_Role` | `HSBA_DV`, `DONTHUOC` | `MAHSBA IN (SELECT MAHSBA FROM HSBA WHERE MABS = …)` |
+| `BS_Role` | `BENHNHAN` | `MABN IN (SELECT MABN FROM HSBA WHERE MABS = …)` |
 
-Mọi UPDATE `CHANDOAN`/`DIEUTRI`/`KETLUAN` và `TENTHUOC`/`LIEUDUNG` đều được ghi vết bằng trigger.
+> Các hàm policy VPD cũng có **nhánh cho KTV và Bệnh nhân** (để RBAC view ở Câu 2 hoạt động dưới VPD),
+> và **miễn lọc cho `BVADMIN`** (phục vụ bảo trì/sửa dữ liệu). Mọi UPDATE
+> `CHANDOAN`/`DIEUTRI`/`KETLUAN` và `TENTHUOC`/`LIEUDUNG` đều được trigger ghi vết.
 
-### Yêu cầu 2 – Oracle Label Security (OLS)
+### Yêu cầu 2 — Oracle Label Security (THONGBAO)
 
-Bảng `THONGBAO` được áp dụng policy `BV_LABEL_POLICY` với **3 thành phần nhãn**:
+Policy `BV_LABEL_POLICY`, nhãn **3 thành phần**:
 
-| Thành phần | Giá trị | Ý nghĩa |
-|-----------|---------|---------|
-| **Level** | `NV(10)` < `LDK(20)` < `BGD(30)` | Cấp bậc nhân sự |
-| **Compartment** | `HCM`, `HPN`, `HNI` | Cơ sở địa điểm (AND) |
-| **Group** | `TH`, `TK`, `TM` | Khoa chuyên môn (OR) |
-
-Nhãn dữ liệu mẫu:
-
-| ID | Nhãn | Gửi đến |
-|----|------|---------|
-| t1 | `NV` | Toàn bộ nhân viên |
-| t2 | `BGD` | Ban Giám đốc |
-| t3 | `LDK` | Tất cả lãnh đạo khoa |
-| t4 | `LDK::TH` | Lãnh đạo Khoa tiêu hóa |
-| t5 | `NV:HCM:TH` | NV Khoa tiêu hóa tại HCM |
-| t6 | `NV:HNI:TH` | NV Khoa tiêu hóa tại Hà Nội |
-| t7 | `LDK:HPN:TH,TK` | Lãnh đạo Khoa TH và TK tại Hải Phòng |
-
-### Yêu cầu 3 – Kiểm toán (Audit)
-
-- **Standard Audit:** 5 ngữ cảnh theo dõi SELECT/UPDATE/INSERT/DELETE trên các bảng nhạy cảm, ghi nhận cả thao tác thành công và thất bại.
-- **Fine-Grained Audit (FGA):** 4 policy theo dõi các hành vi đặc thù (cập nhật đơn thuốc sau khi tạo, cập nhật hợp lệ và bất hợp pháp HSBA, thao tác bất hợp pháp trên HSBA_DV).
-- **Trigger log:** Bảng `LOG_BS_HSBA`, `LOG_BS_DONTHUOC`, `LOG_KTV_KETQUA` ghi vết chi tiết giá trị cũ/mới.
-
-### Yêu cầu 4 – Sao lưu và Phục hồi
-
-| Phương pháp | Loại | Lịch tự động |
-|-------------|------|--------------|
-| RMAN Full Backup | Physical | Chủ nhật 1:00 AM |
-| RMAN Incremental Level 1 | Physical | Hàng đêm 2:00 AM |
-| Data Pump (expdp) | Logical | Hàng tuần |
-| Flashback Database | Point-in-time | Retention 24h |
-
----
-
-## Cài đặt và chạy
-
-### Yêu cầu
-
-- Oracle Database 19c+
-- .NET 8 SDK (Windows)
-- NuGet: `Oracle.ManagedDataAccess.Core 23.4.0`
-
-### Bước 1 – Khởi tạo CSDL
-
-Chạy tuần tự các script trong `PhanHe2/` với SQL*Plus hoặc SQL Developer:
-
-```sql
--- Kết nối với SYSTEM/oracle
-@PhanHe2/01_schema_data.sql
-@PhanHe2/02_TC1_accounts.sql
-@PhanHe2/03_YC1_C2_RBAC_KTV_BN.sql
-@PhanHe2/04_YC1_C3_VPD_DPV_BS.sql
-@PhanHe2/05_YC2_OLS_ThongBao.sql    -- Cần LBACSYS (Oracle Label Security)
-@PhanHe2/06_YC3_Audit.sql
-@PhanHe2/07_YC4_Backup_Recovery.sql
-@PhanHe2/08_App_Migrations.sql
-@PhanHe2/09_OLS_NhanVien_Unified.sql
-@PhanHe2/09_Recovery_Demo.sql        -- Demo, có thể chạy riêng khi vấn đáp
-```
-
-Hoặc dùng runner PowerShell:
-
-```powershell
-.\scripts\setup.ps1 -HostName localhost -Port 1521 -Sid XEPDB1 -SysPass oracle -SkipRecoveryDemo
-```
-
-### Bước 2 – Chạy ứng dụng
-
-```bash
-cd HospitalApp
-dotnet restore
-dotnet run
-```
-
-### Bước 3 – Đăng nhập
-
-Nhập thông tin kết nối Oracle XE và tài khoản. Ứng dụng tự nhận diện vai trò và mở giao diện phù hợp:
-
-```text
-Host: localhost
-Port: 1521
-Service: XEPDB1
-```
-
-| Tài khoản | Vai trò | Giao diện |
+| Thành phần | Giá trị | Ngữ nghĩa |
 |-----------|---------|-----------|
-| `SYSTEM` / DBA | Quản trị viên | AdminDashboard – Phân hệ 1 |
-| `DPV_NV001` | Điều phối viên | DPVForm |
-| `BS_NV003` | Bác sĩ / Y sĩ | BSForm |
-| `KTV_NV006` | Kỹ thuật viên | KTVForm |
-| `BN_BN001` | Bệnh nhân | BNForm |
-| `u1_giamdoc` | OLS demo | OLSViewerForm |
-| `u4_nvtk_hcm` | OLS demo | OLSViewerForm |
-| `u8_nvth_hni` | OLS demo | OLSViewerForm |
+| **Level** | `NV(10)` < `LDK(20)` < `BGD(30)` | Cấp bậc |
+| **Compartment** | `HCM`, `HPN`, `HNI` | Cơ sở (AND – phải đúng cơ sở) |
+| **Group** | `TH`, `TK`, `TM` | Khoa (OR – cần ≥1 khoa) |
 
-> Mật khẩu mặc định cho tài khoản mẫu: `BV@2025!`
+Nhãn dữ liệu mẫu t1–t7: `NV`, `BGD`, `LDK`, `LDK::TH`, `NV:HCM:TH`, `NV:HNI:TH`, `LDK:HPN:TH,TK`.
+User u1–u8 được gán `max_read_label` tương ứng (xem file 05). User u1–u8 được tạo bằng SYSTEM, gán nhãn bằng LBACSYS.
 
-Mật khẩu OLS demo: `U1@2025`, `U2@2025`, ..., `U8@2025`.
+### Yêu cầu 3 — Kiểm toán
 
-### Font Montserrat
+- **Standard Audit:** 5 ngữ cảnh theo user/đối tượng cụ thể, cả thành công lẫn thất bại.
+- **Fine-Grained Audit (FGA):** 4 tình huống (cập nhật ĐƠNTHUỐC sau khi tạo; BS cập nhật HSBA hợp lệ; cập nhật bất hợp pháp; thao tác bất hợp pháp trên HSBA_DV).
+  - ⚠️ `audit_condition` của FGA **phải là một predicate đơn** — không được chứa `AND`/`OR`/`IN` (vi phạm → `ORA-28138` khi DML). Các tình huống "bất hợp pháp" vì thế bọc logic nhiều toán tử vào hàm `fn_is_illegal_hsba` / `fn_is_illegal_hsba_dv` (trả `'Y'/'N'`) rồi so sánh đơn.
+- **Trigger log:** `LOG_BS_HSBA`, `LOG_BS_DONTHUOC`, `LOG_KTV_KETQUA` (lưu giá trị cũ/mới).
+- ⚠️ Trên Oracle 21c chạy **Unified Auditing**, đọc nhật ký từ `UNIFIED_AUDIT_TRAIL` (xem PHẦN 1B trong file 06) thay vì `DBA_AUDIT_TRAIL`.
 
-App tự nạp font từ `HospitalApp/Resources/Fonts/*.ttf`. Nếu máy chưa có font, copy các file Montserrat `.ttf` vào thư mục này rồi build lại. Nếu không có file font, app fallback về Segoe UI và vẫn chạy bình thường.
+### Yêu cầu 4 — Sao lưu & Phục hồi
 
-### Oracle Net Encryption
-
-Xem [docs/guides/SETUP_ENCRYPTION.md](docs/guides/SETUP_ENCRYPTION.md). Tóm tắt cấu hình client trong `sqlnet.ora`:
-
-```text
-SQLNET.ENCRYPTION_CLIENT = REQUIRED
-SQLNET.ENCRYPTION_TYPES_CLIENT = (AES256, AES192, AES128)
-SQLNET.CRYPTO_CHECKSUM_CLIENT = REQUIRED
-SQLNET.CRYPTO_CHECKSUM_TYPES_CLIENT = (SHA512, SHA384, SHA256)
-```
-
-Kiểm tra bằng:
-
-```sql
-SELECT NETWORK_SERVICE_BANNER
-FROM V$SESSION_CONNECT_INFO
-WHERE SID = SYS_CONTEXT('USERENV','SID');
-```
-
-### Bảo mật lớp ứng dụng
-
-- `HospitalApp/Security/OracleErrorMapper.cs`: map lỗi Oracle sang thông báo thân thiện, tránh lộ raw schema/error.
-- `HospitalApp/Security/InputValidator.cs`: validate CCCD, số điện thoại, mã định danh, password strength, mask CCCD.
-- `HospitalApp/Security/SessionManager.cs`: idle timeout và tự logout.
-- `HospitalApp/Security/AppAuditLogger.cs`: rolling log phía app.
-- `HospitalApp/Controls/ConfirmDeleteDialog.cs`: xác nhận thao tác xoá.
-- `HospitalApp/Forms/LoginForm.cs`: brute-force lockout 5 lần sai trong 60 giây.
-
-### Tài liệu nộp bài và vấn đáp
-
-- [docs/reports/REPORT_DRAFT.md](docs/reports/REPORT_DRAFT.md): khung báo cáo Markdown để điền MSSV, ảnh chụp và convert sang `.docx`.
-- [docs/guides/DEMO_SCRIPT.md](docs/guides/DEMO_SCRIPT.md): kịch bản demo từng role.
-- [docs/guides/TALKING_POINTS.md](docs/guides/TALKING_POINTS.md): câu hỏi vấn đáp thường gặp.
-- [docs/reports/FINAL_REVIEW.md](docs/reports/FINAL_REVIEW.md): review cuối sau khi hoàn thiện repo.
+| Phương pháp | Loại | Ghi chú |
+|-------------|------|---------|
+| RMAN Full / Incremental | Physical | Job Scheduler gọi `.bat` (mặc định **chưa bật** — bật sau khi cấu hình đường dẫn) |
+| Data Pump (expdp) | Logical | Job Scheduler gọi `.bat` |
+| Flashback Table / Query | Point-in-time | Dùng undo + ROW MOVEMENT — demo ở `09_Recovery_Demo.sql` |
 
 ---
 
-## Bảo mật ở tầng Database
+## 9. Bảo mật & UTF-8 ở tầng ứng dụng
 
-Tất cả kiểm soát truy cập được thực thi tại **Oracle DB Engine** — ứng dụng không cần xử lý thêm logic bảo mật:
+- **Tiếng Việt (UTF-8) đầu-cuối:** đọc dữ liệu qua `TO_NCHAR(...)` (giữ Unicode, không phụ thuộc DB charset);
+  ghi dữ liệu bind tham số kiểu **`NVarchar2`** (`OracleHelper.Param`); mọi file `.cs` lưu **UTF-8 có BOM**.
+- **Font Montserrat** được **nhúng** (`Resources/Fonts/*.ttf`, đủ glyph tiếng Việt); fallback Segoe UI nếu thiếu.
+- `Security/OracleErrorMapper.cs` – map lỗi Oracle sang thông báo thân thiện (không lộ schema).
+- `Security/InputValidator.cs` – validate CCCD/SĐT/mã định danh, mask CCCD.
+- `Security/SessionManager.cs` – idle timeout tự logout.
+- `Security/AppAuditLogger.cs` – log phía app.
+- `Forms/LoginForm.cs` – khoá brute-force 5 lần sai / 60 giây.
+- Oracle Net Encryption (TLS/checksum): xem [docs/guides/SETUP_ENCRYPTION.md](docs/guides/SETUP_ENCRYPTION.md).
 
-```
-Người dùng gửi SQL
-       │
-       ▼
-  Oracle Engine
-       ├── RBAC  → kiểm tra user có role/privilege phù hợp không
-       ├── VPD   → tự động thêm WHERE clause vào câu query
-       └── OLS   → so sánh nhãn data với nhãn user trước khi trả kết quả
-       │
-       ▼
-  Trả về đúng dữ liệu người dùng được phép thấy
-```
+Tất cả kiểm soát truy cập do **Oracle DB Engine** thực thi (RBAC + VPD + OLS) — app kết nối bằng đúng tài khoản đăng nhập, không tự xử lý logic phân quyền.
+
+---
+
+## 10. Khắc phục sự cố thường gặp
+
+| Triệu chứng | Nguyên nhân & cách xử lý |
+|-------------|--------------------------|
+| `ORA-01756 quoted string not properly terminated`, chữ Việt thành rác (`ßnh`, `Θ`, `╨`…) khi chạy `setup.ps1` | `setup.ps1` cũ ghi file tạm bằng ANSI làm hỏng UTF-8 → **đã sửa** (ghi UTF-8 + tự đặt `NLS_LANG`); dùng bản `setup.ps1` mới |
+| `ORA-01920`/`ORA-00955`/`ORA-00947` khi chạy lại | DB còn `BVADMIN`/bảng/role từ lần trước → chạy `setup.ps1` với **`-Reset`** (drop sạch rồi tạo lại) |
+| `PLS-00103 Encountered end-of-file` ở `EXEC ...` (file 02) | Comment `--` cùng dòng `EXEC` nuốt mất `END;` → **đã sửa** (bỏ comment cuối dòng); dùng bản file 02 mới |
+| `ORA-00933 SQL command not properly ended` ở câu GRANT/ALTER | Có comment `--` ngay sau `;` trên cùng dòng → SQL\*Plus không nhận `;` là dấu kết thúc → **đã sửa** (đưa comment lên dòng riêng) |
+| `Enter value for ...:` (prompt đứng im) | Ký tự `&` trong comment/chuỗi bị hiểu là biến thay thế → **đã sửa** (`setup.ps1` tự `SET DEFINE OFF`; bỏ `&` trong comment). Đang kẹt: bấm **Ctrl+C** để thoát |
+| Tiếng Việt thành `???` / lỗi dấu trong DB | Chưa `set NLS_LANG=.AL32UTF8` trước khi chạy 01 → chạy lại sau khi set, hoặc chạy `12_Fix_UTF8_Data.sql` bằng BVADMIN |
+| Tiếng Việt lỗi dấu trên giao diện | Dùng bản app mới (đã đổi `TO_CHAR`→`TO_NCHAR` + bind `NVarchar2`); rebuild lại |
+| File 05 lỗi `SA_*`/`LBACSYS` | OLS chưa được cài/mở khoá → xem §4 |
+| `ORA-01017 invalid username/password` khi chạy script | Mật khẩu CONNECT trong file chưa khớp DB → sửa lại (SYS/SYSTEM/LBACSYS/BVADMIN) — xem §2 |
+| **`ORA-28138`** khi BS *thêm dịch vụ chẩn đoán* hoặc KTV *lưu kết quả* | `audit_condition` của FGA chứa `OR`/`NOT IN` (Oracle chỉ cho 1 predicate đơn) → **đã sửa** (file 06 bọc logic vào hàm `fn_is_illegal_hsba*` trả `'Y'/'N'`). Áp dụng nhanh không cần `-Reset`: chạy `PhanHe2/fix_fga_ora28138.sql` bằng `BVADMIN`, hoặc `setup.ps1 -Reset` |
+| Đăng nhập app bằng `SYSTEM` báo `ORA-01017` | Mật khẩu `oracle` chỉ là **giả định** — nhập đúng mật khẩu SYSTEM thật của bạn; hoặc dùng `HOSPITAL_DBA/Hospital@DBA2025` (xem §6) |
+| Đăng nhập app báo `ORA-28000`/`ORA-28001` | Tài khoản bị **khoá** / mật khẩu **hết hạn** ở DB → `ALTER USER <user> ACCOUNT UNLOCK;` (và đặt lại mật khẩu nếu cần) bằng SYS/SYSTEM |
+| Đăng nhập app báo "Tài khoản tạm khoá Ns" | App tự khoá 60 giây sau **5 lần sai** liên tiếp → đợi hết khoá rồi nhập đúng mật khẩu |
+| DPV/BS không thấy danh sách bác sĩ/KTV | Chưa chạy `11_NV_Lookup_Grants.sql` (Pha B) |
+| Đăng nhập DBA không vào được AdminDashboard | Chưa chạy `setup_admin_user.sql` (Pha C) hoặc dùng `HOSPITAL_DBA/Hospital@DBA2025` |
+| Audit trả 0 dòng | DB ở chế độ Unified Auditing → đọc `UNIFIED_AUDIT_TRAIL` (file 06 PHẦN 1B) |
+
+---
+
+## 11. Tài liệu kèm theo
+
+- [PhanHe2/REVIEW_LOI_PHANHE2.md](PhanHe2/REVIEW_LOI_PHANHE2.md) – rà soát lỗi chi tiết + trạng thái đã sửa (checklist B/H/M/L).
+- [docs/reports/REPORT_DRAFT.md](docs/reports/REPORT_DRAFT.md) – khung báo cáo để điền MSSV/ảnh, convert `.docx`.
+- [docs/guides/DEMO_SCRIPT.md](docs/guides/DEMO_SCRIPT.md) – kịch bản demo từng vai trò.
+- [docs/guides/TALKING_POINTS.md](docs/guides/TALKING_POINTS.md) – câu hỏi vấn đáp thường gặp.
+- [docs/guides/SETUP_ENCRYPTION.md](docs/guides/SETUP_ENCRYPTION.md) – cấu hình Oracle Net Encryption.
+- [docs/reports/FINAL_REVIEW.md](docs/reports/FINAL_REVIEW.md) – review tổng thể.

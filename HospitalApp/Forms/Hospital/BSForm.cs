@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using HospitalApp.Controls;
 using HospitalApp.Database;
 using HospitalApp.Security;
@@ -84,8 +84,8 @@ public class BSForm : Form
 
         var status = new StatusBar
         {
-            LeftText   = $"{IconRegistry.Database}  {_db.Host}:{_db.Port}/{_db.Sid}",
-            CenterText = $"{_db.Username}  ·  Bác sĩ  ·  {IconRegistry.Shield} VPD enforced"
+            LeftText   = $"{_db.Host}:{_db.Port}/{_db.Sid}",
+            CenterText = $"{_db.Username}  ·  Bác sĩ  ·  VPD enforced"
         };
 
         Controls.Add(_tabs);
@@ -175,22 +175,50 @@ public class BSForm : Form
         var detail = new TabControl { Dock = DockStyle.Fill };
 
         // Sub-tab 1: Chỉnh sửa chẩn đoán
+        // FIX (Ảnh 5): dùng TableLayoutPanel docked thay FlowLayoutPanel cố định 600px
+        // -> 3 ô textarea trải hết bề ngang, chia đều chiều cao, không cắt "Kết luận".
         var tDetail = new TabPage("Cập nhật HSBA");
-        var fl = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
-                                       Padding = new Padding(10), AutoScroll = true,
-                                       WrapContents = false };
+        var fl = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 8,
+            Padding = new Padding(12, 10, 12, 10),
+            AutoScroll = true
+        };
+        fl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        fl.RowStyles.Add(new RowStyle(SizeType.AutoSize));                 // 0: ID
+        fl.RowStyles.Add(new RowStyle(SizeType.AutoSize));                 // 1: label Chẩn đoán
+        fl.RowStyles.Add(new RowStyle(SizeType.Percent, 100));            // 2: textarea Chẩn đoán
+        fl.RowStyles.Add(new RowStyle(SizeType.AutoSize));                 // 3: label Điều trị
+        fl.RowStyles.Add(new RowStyle(SizeType.Percent, 100));            // 4: textarea Điều trị
+        fl.RowStyles.Add(new RowStyle(SizeType.AutoSize));                 // 5: label Kết luận
+        fl.RowStyles.Add(new RowStyle(SizeType.Percent, 100));            // 6: textarea Kết luận
+        fl.RowStyles.Add(new RowStyle(SizeType.AutoSize));                 // 7: nút Lưu
+
         _lblHSBAId = new Label { AutoSize = true, Font = UiTheme.LabelBold(),
-                                 ForeColor = Color.Navy };
-        fl.Controls.Add(_lblHSBAId);
-        fl.Controls.Add(new Label { Text = "Chẩn đoán:", AutoSize = true });
-        _txtChandoan = TB(600, 60); fl.Controls.Add(_txtChandoan);
-        fl.Controls.Add(new Label { Text = "Điều trị:", AutoSize = true });
-        _txtDieutri = TB(600, 60); fl.Controls.Add(_txtDieutri);
-        fl.Controls.Add(new Label { Text = "Kết luận:", AutoSize = true });
-        _txtKetluan = TB(600, 60); fl.Controls.Add(_txtKetluan);
+                                 ForeColor = Color.Navy, Margin = new Padding(0, 0, 0, 6) };
+        fl.Controls.Add(_lblHSBAId, 0, 0);
+
+        fl.Controls.Add(new Label { Text = "Chẩn đoán:", AutoSize = true,
+                                    Margin = new Padding(0, 2, 0, 2) }, 0, 1);
+        _txtChandoan = TBFill(80);
+        fl.Controls.Add(_txtChandoan, 0, 2);
+
+        fl.Controls.Add(new Label { Text = "Điều trị:", AutoSize = true,
+                                    Margin = new Padding(0, 2, 0, 2) }, 0, 3);
+        _txtDieutri = TBFill(80);
+        fl.Controls.Add(_txtDieutri, 0, 4);
+
+        fl.Controls.Add(new Label { Text = "Kết luận:", AutoSize = true,
+                                    Margin = new Padding(0, 2, 0, 2) }, 0, 5);
+        _txtKetluan = TBFill(80);
+        fl.Controls.Add(_txtKetluan, 0, 6);
+
         _btnSaveHSBA = Btn("Lưu HSBA", UiTheme.HealthGreen);
+        _btnSaveHSBA.Margin = new Padding(0, 8, 0, 0);
         _btnSaveHSBA.Click += BtnSaveHSBA_Click;
-        fl.Controls.Add(_btnSaveHSBA);
+        fl.Controls.Add(_btnSaveHSBA, 0, 7);
         tDetail.Controls.Add(fl);
 
         // Sub-tab 2: Dịch vụ (HSBA_DV)
@@ -299,8 +327,8 @@ public class BSForm : Form
             var dt = _db.Query(
                 "SELECT MAHSBA, MABN, TO_CHAR(NGAY,'DD/MM/YYYY') AS NGAY, " +
                 "MAKHOA, MABS, " +
-                "SUBSTR(TO_CHAR(CHANDOAN),1,60) AS CHANDOAN, " +
-                "SUBSTR(TO_CHAR(KETLUAN),1,40) AS KETLUAN " +
+                "SUBSTR(TO_NCHAR(CHANDOAN),1,60) AS CHANDOAN, " +
+                "SUBSTR(TO_NCHAR(KETLUAN),1,40) AS KETLUAN " +
                 "FROM BVADMIN.HSBA ORDER BY NGAY DESC");
             _dgvHSBA.DataSource = dt;
         });
@@ -316,7 +344,7 @@ public class BSForm : Form
 
             // Load full CHANDOAN/DIEUTRI/KETLUAN
             var dt = _db.Query(
-                "SELECT TO_CHAR(CHANDOAN) AS C, TO_CHAR(DIEUTRI) AS D, TO_CHAR(KETLUAN) AS K " +
+                "SELECT TO_NCHAR(CHANDOAN) AS C, TO_NCHAR(DIEUTRI) AS D, TO_NCHAR(KETLUAN) AS K " +
                 "FROM BVADMIN.HSBA WHERE MAHSBA = :id",
                 OracleHelper.Param("id", mahsba));
             if (dt.Rows.Count > 0)
@@ -329,7 +357,7 @@ public class BSForm : Form
             // Load HSBA_DV
             _dgvDV.DataSource = _db.Query(
                 "SELECT LOAIDV, TO_CHAR(NGAYDV,'DD/MM/YYYY') AS NGAYDV, MAKTV, " +
-                "SUBSTR(TO_CHAR(KETQUA),1,60) AS KETQUA " +
+                "SUBSTR(TO_NCHAR(KETQUA),1,60) AS KETQUA " +
                 "FROM BVADMIN.HSBA_DV WHERE MAHSBA = :id ORDER BY NGAYDV",
                 OracleHelper.Param("id", mahsba));
 
@@ -556,7 +584,7 @@ public class BSForm : Form
             var mabn = _dgvBN.CurrentRow.Cells["MABN"].Value?.ToString() ?? "";
             _lblBNId.Text = $"MABN: {mabn}";
             var dt = _db.Query(
-                "SELECT TO_CHAR(TIENSUBENH) AS TSB, TO_CHAR(TIENSUBENHGD) AS TSBGD, DIUNGTHUOC " +
+                "SELECT TO_NCHAR(TIENSUBENH) AS TSB, TO_NCHAR(TIENSUBENHGD) AS TSBGD, DIUNGTHUOC " +
                 "FROM BVADMIN.BENHNHAN WHERE MABN = :id",
                 OracleHelper.Param("id", mabn));
             if (dt.Rows.Count > 0)
@@ -608,7 +636,7 @@ public class BSForm : Form
                 lblLabel.Text = "Nhãn OLS: " + CurrentOlsLabel();
                 // OLS tự filter: BS chỉ thấy thông báo phù hợp với nhãn của mình
                 dgv.DataSource = _db.Query(
-                    "SELECT MATB, SUBSTR(TO_CHAR(NOIDUNG),1,100) AS NOIDUNG, " +
+                    "SELECT MATB, SUBSTR(TO_NCHAR(NOIDUNG),1,100) AS NOIDUNG, " +
                     "TO_CHAR(NGAYGIO,'DD/MM/YYYY HH24:MI') AS NGAYGIO, DIADIEM " +
                     "FROM BVADMIN.THONGBAO ORDER BY NGAYGIO DESC");
             });
@@ -641,6 +669,18 @@ public class BSForm : Form
     private static TextBox TB(int width, int height = 30) =>
         new() { Multiline = height > 30, Width = width, Height = Math.Max(height, 30),
                 Font = UiTheme.Body(), ScrollBars = height > 30 ? ScrollBars.Vertical : ScrollBars.None };
+
+    // Ô textarea trải hết bề ngang ô chứa (Dock=Fill) + co giãn theo hàng Percent, có chiều cao tối thiểu.
+    private static TextBox TBFill(int minHeight = 80) =>
+        new()
+        {
+            Multiline = true,
+            Dock = DockStyle.Fill,
+            MinimumSize = new Size(0, minHeight),
+            Margin = new Padding(0, 0, 0, 8),
+            Font = UiTheme.Body(),
+            ScrollBars = ScrollBars.Vertical
+        };
 
     private static Button Btn(string text, Color color, int width = 140)
     {
@@ -691,9 +731,7 @@ public class BSForm : Form
         try
         {
             return _db.Scalar(
-                "SELECT NVL(MAX(MAX_READ_LABEL), '(chưa gán)') " +
-                "FROM DBA_SA_USER_LABELS " +
-                "WHERE POLICY_NAME='BV_LABEL_POLICY' AND USER_NAME=USER")?.ToString() ?? "(chưa gán)";
+                "SELECT LBACSYS.fn_my_ols_label('BV_LABEL_POLICY') FROM DUAL")?.ToString() ?? "(chưa gán)";
         }
         catch { return "(không đọc được DBA_SA_USER_LABELS)"; }
     }
@@ -715,7 +753,11 @@ internal class AddDVDialog : Form
     public AddDVDialog(System.Data.DataTable ktvList)
     {
         Text = "Thêm Dịch vụ chẩn đoán";
-        Size = new Size(420, 230);
+        // FIX (Ảnh 4): dùng ClientSize (không phải Size) để title bar/viền không ăn vào vùng dùng được,
+        // và pin AutoScaleMode để khi màn hình scale (125%/150%) vùng client giãn theo control -> không cắt nút.
+        AutoScaleMode = AutoScaleMode.Font;
+        AutoScaleDimensions = new SizeF(96f, 96f);
+        ClientSize = new Size(420, 200);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false; MinimizeBox = false;
@@ -737,12 +779,16 @@ internal class AddDVDialog : Form
 
         var ok = new Button
         {
-            Text = "Thêm", Location = new Point(140, 130), Width = 90, Height = 32,
+            Text = "Thêm", Width = 90, Height = 32,
+            Location = new Point(ClientSize.Width - 90 - 90 - 20, ClientSize.Height - 32 - 16),
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
             DialogResult = DialogResult.OK
         };
         var cancel = new Button
         {
-            Text = "Hủy", Location = new Point(250, 130), Width = 90, Height = 32,
+            Text = "Hủy", Width = 90, Height = 32,
+            Location = new Point(ClientSize.Width - 90 - 16, ClientSize.Height - 32 - 16),
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
             DialogResult = DialogResult.Cancel
         };
 

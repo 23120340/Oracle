@@ -1,4 +1,4 @@
-namespace HospitalApp.Security;
+﻿namespace HospitalApp.Security;
 
 /// <summary>
 /// Theo dõi idle time. Sau N phút không có thao tác (chuột/phím) → đóng form

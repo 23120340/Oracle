@@ -1,4 +1,4 @@
-namespace HospitalApp.Theme;
+﻿namespace HospitalApp.Theme;
 
 /// <summary>
 /// Segoe Fluent Icons (Windows 10/11 built-in) codepoint constants.

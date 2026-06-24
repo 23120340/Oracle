@@ -1,4 +1,4 @@
-using HospitalApp.Controls;
+﻿using HospitalApp.Controls;
 using HospitalApp.Database;
 using HospitalApp.Security;
 using HospitalApp.Theme;
@@ -71,8 +71,8 @@ public class KTVForm : Form
 
         var status = new StatusBar
         {
-            LeftText   = $"{IconRegistry.Database}  {_db.Host}:{_db.Port}/{_db.Sid}",
-            CenterText = $"{_db.Username}  ·  Kỹ thuật viên  ·  {IconRegistry.Shield} RBAC view"
+            LeftText   = $"{_db.Host}:{_db.Port}/{_db.Sid}",
+            CenterText = $"{_db.Username}  ·  Kỹ thuật viên  ·  RBAC view"
         };
 
         Controls.Add(_tabs);
@@ -170,7 +170,7 @@ public class KTVForm : Form
         {
             lblLabel.Text = "Nhãn OLS: " + CurrentOlsLabel();
             dgv.DataSource = _db.Query(
-                "SELECT MATB, SUBSTR(TO_CHAR(NOIDUNG),1,100) AS NOIDUNG, " +
+                "SELECT MATB, SUBSTR(TO_NCHAR(NOIDUNG),1,100) AS NOIDUNG, " +
                 "TO_CHAR(NGAYGIO,'DD/MM/YYYY HH24:MI') AS NGAYGIO, DIADIEM " +
                 "FROM BVADMIN.THONGBAO ORDER BY NGAYGIO DESC");
         });
@@ -233,38 +233,60 @@ public class KTVForm : Form
         tool.Controls.Add(_lblInfo);
 
         // Bottom: cập nhật kết quả
+        // FIX (Ảnh 6): trước đây Label(Top)/TextBox(Fill)/Button(Bottom) trộn trong 1 Panel
+        // -> WinForms phân giải Dock ngược z-order khiến Label vẽ đè lên đầu TextBox (chữ "lấn lên/không hiện")
+        // và nút chồng đáy TextBox. Dùng TableLayoutPanel 3 hàng: mỗi control 1 ô riêng, không thể chồng.
         var bottom = new Panel
         {
             Dock = DockStyle.Bottom, Height = 140,
             BackColor = Color.FromArgb(245, 252, 245),
             Padding = new Padding(10)
         };
-        bottom.Controls.Add(new Label
+        var bottomLayout = new TableLayoutPanel
         {
-            Text = "Kết quả xét nghiệm/dịch vụ:", Dock = DockStyle.Top,
-            Font = UiTheme.LabelBold(), Height = 22
-        });
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        bottomLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        bottomLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));   // hàng nhãn
+        bottomLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));   // hàng TextBox (Fill)
+        bottomLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));   // hàng nút Lưu
+
+        var lblKQ = new Label
+        {
+            Text = "Kết quả xét nghiệm/dịch vụ:",
+            Dock = DockStyle.Fill,
+            Font = UiTheme.LabelBold(),
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = Padding.Empty
+        };
         _txtKQ = new TextBox
         {
             Dock = DockStyle.Fill, Multiline = true, ScrollBars = ScrollBars.Vertical,
-            Font = UiTheme.Body(), BorderStyle = BorderStyle.FixedSingle
+            Font = UiTheme.Body(), BorderStyle = BorderStyle.FixedSingle,
+            Margin = new Padding(0, 2, 0, 4)
         };
-        bottom.Controls.Add(_txtKQ);
-
         _btnSave = new Button
         {
-            Dock = DockStyle.Bottom, Text = "Lưu kết quả",
-            Height = 36, BackColor = Color.FromArgb(0, 140, 60),
+            Dock = DockStyle.Fill, Text = "Lưu kết quả",
+            BackColor = Color.FromArgb(0, 140, 60),
             ForeColor = Color.White, FlatStyle = FlatStyle.Flat,
             Font = UiTheme.Button(10f), Cursor = Cursors.Hand,
             Padding = new Padding(8, 0, 8, 0),
             TextAlign = ContentAlignment.MiddleCenter,
-            UseCompatibleTextRendering = false
+            UseCompatibleTextRendering = false,
+            Margin = Padding.Empty
         };
-        _btnSave.Height = 38;
         _btnSave.FlatAppearance.BorderSize = 0;
         _btnSave.Click += BtnSave_Click;
-        bottom.Controls.Add(_btnSave);
+
+        bottomLayout.Controls.Add(lblKQ,    0, 0);
+        bottomLayout.Controls.Add(_txtKQ,   0, 1);
+        bottomLayout.Controls.Add(_btnSave, 0, 2);
+        bottom.Controls.Add(bottomLayout);
 
         // Grid (Fill — phải add cuối cùng để chiếm phần còn lại)
         _dgvDV = UiTheme.Grid();
@@ -281,7 +303,7 @@ public class KTVForm : Form
         };
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 150));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 220));   // nhãn 24 + nút 40 + padding -> TextBox còn ~136px hiện rõ chữ
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         tool.Dock = DockStyle.Fill;
         tool.Margin = Padding.Empty;
@@ -302,7 +324,7 @@ public class KTVForm : Form
             // KTV_HSBA_DV_View đã filter MAKTV = fn_get_manv() → chỉ thấy DV của mình
             var dt = _db.Query(
                 "SELECT MAHSBA, LOAIDV, TO_CHAR(NGAYDV,'DD/MM/YYYY') AS NGAYDV, " +
-                "MAKTV, SUBSTR(TO_CHAR(KETQUA),1,80) AS KETQUA " +
+                "MAKTV, SUBSTR(TO_NCHAR(KETQUA),1,80) AS KETQUA " +
                 "FROM BVADMIN.KTV_HSBA_DV_View " +
                 "ORDER BY NGAYDV DESC, MAHSBA");
             _dgvDV.DataSource = dt;
@@ -320,7 +342,7 @@ public class KTVForm : Form
 
             // Load full KETQUA (có thể dài hơn 80 ký tự hiển thị trong grid)
             var dt = _db.Query(
-                "SELECT TO_CHAR(KETQUA) AS KQ FROM BVADMIN.KTV_HSBA_DV_View " +
+                "SELECT TO_NCHAR(KETQUA) AS KQ FROM BVADMIN.KTV_HSBA_DV_View " +
                 "WHERE MAHSBA=:h AND LOAIDV=:l",
                 OracleHelper.Param("h", mahsba),
                 OracleHelper.Param("l", loaidv));
@@ -374,9 +396,7 @@ public class KTVForm : Form
         try
         {
             return _db.Scalar(
-                "SELECT NVL(MAX(MAX_READ_LABEL), '(chưa gán)') " +
-                "FROM DBA_SA_USER_LABELS " +
-                "WHERE POLICY_NAME='BV_LABEL_POLICY' AND USER_NAME=USER")?.ToString() ?? "(chưa gán)";
+                "SELECT LBACSYS.fn_my_ols_label('BV_LABEL_POLICY') FROM DUAL")?.ToString() ?? "(chưa gán)";
         }
         catch { return "(không đọc được DBA_SA_USER_LABELS)"; }
     }

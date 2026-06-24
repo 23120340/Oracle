@@ -106,18 +106,21 @@ END;
 -- ============================================================
 SET SERVEROUTPUT ON;
 
-EXEC BVADMIN.sp_create_nhanvien_account('NV001');  -- DPV_NV001
-EXEC BVADMIN.sp_create_nhanvien_account('NV002');  -- DPV_NV002
-EXEC BVADMIN.sp_create_nhanvien_account('NV003');  -- BS_NV003
-EXEC BVADMIN.sp_create_nhanvien_account('NV004');  -- BS_NV004
-EXEC BVADMIN.sp_create_nhanvien_account('NV005');  -- BS_NV005
-EXEC BVADMIN.sp_create_nhanvien_account('NV006');  -- KTV_NV006
-EXEC BVADMIN.sp_create_nhanvien_account('NV007');  -- KTV_NV007
+-- LƯU Ý: KHÔNG để comment "--" cùng dòng với EXEC — comment sẽ "nuốt" mất END; do EXEC
+-- tự bọc thành "BEGIN <lệnh>; END;" trên một dòng → lỗi PLS-00103.
+-- NV001/NV002 → DPV ; NV003-005 → BS ; NV006/007 → KTV
+EXEC BVADMIN.sp_create_nhanvien_account('NV001');
+EXEC BVADMIN.sp_create_nhanvien_account('NV002');
+EXEC BVADMIN.sp_create_nhanvien_account('NV003');
+EXEC BVADMIN.sp_create_nhanvien_account('NV004');
+EXEC BVADMIN.sp_create_nhanvien_account('NV005');
+EXEC BVADMIN.sp_create_nhanvien_account('NV006');
+EXEC BVADMIN.sp_create_nhanvien_account('NV007');
 
 -- Tạo tài khoản cho bệnh nhân mẫu
-EXEC BVADMIN.sp_create_benhnhan_account('BN001');  -- BN_BN001
-EXEC BVADMIN.sp_create_benhnhan_account('BN002');  -- BN_BN002
-EXEC BVADMIN.sp_create_benhnhan_account('BN003');  -- BN_BN003
+EXEC BVADMIN.sp_create_benhnhan_account('BN001');
+EXEC BVADMIN.sp_create_benhnhan_account('BN002');
+EXEC BVADMIN.sp_create_benhnhan_account('BN003');
 
 -- ============================================================
 -- Kiểm chứng TC#1: kết nối 1 tài khoản với 1 dòng dữ liệu

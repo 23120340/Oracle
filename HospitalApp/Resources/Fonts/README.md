@@ -1,29 +1,34 @@
 # Montserrat Font
 
-Đặt các file `.ttf` Montserrat vào thư mục này. App sẽ tự động embed và load.
+Thư mục này chứa font **Montserrat** được **nhúng** vào ứng dụng (embedded resource).
 
-## Cách lấy font
+## Đã có sẵn
 
-1. Vào https://fonts.google.com/specimen/Montserrat
-2. Click **"Get font"** → **"Download all"**
-3. Giải nén, copy các file sau vào thư mục này:
-   - `Montserrat-Regular.ttf`
-   - `Montserrat-Medium.ttf`
-   - `Montserrat-SemiBold.ttf`
-   - `Montserrat-Bold.ttf`
-   - `Montserrat-Italic.ttf` (tùy chọn)
+| File | Family | Style |
+|------|--------|-------|
+| `Montserrat-Regular.ttf` | Montserrat | Regular (400) |
+| `Montserrat-Bold.ttf` | Montserrat | Bold (700) |
+
+> Cả hai face đều hỗ trợ **đầy đủ tiếng Việt** (Latin Extended). `UiTheme` tự suy ra Italic/Medium
+> bằng GDI+ khi cần. Bold dùng face thật (700).
+
+## Cơ chế nạp
+
+- [HospitalApp.csproj](../../HospitalApp.csproj) khai báo `<EmbeddedResource Include="Resources/Fonts/*.ttf" />`
+  → mọi file `.ttf` ở đây được nhúng vào `HospitalApp.dll`.
+- [Theme/UiTheme.cs](../../Theme/UiTheme.cs) đọc các resource `.ttf`, nạp vào `PrivateFontCollection`,
+  chọn family **"Montserrat"**.
+- [Program.cs](../../Program.cs) gọi `Application.SetDefaultFont(UiTheme.Body())` → Montserrat làm font mặc định toàn app.
+
+## Thêm/đổi weight (tuỳ chọn)
+
+Muốn dùng thêm Medium/SemiBold thật, tải từ <https://fonts.google.com/specimen/Montserrat>
+và copy vào đây. **Lưu ý:** các file static `Montserrat-Medium.ttf`/`Montserrat-SemiBold.ttf`
+mang family riêng ("Montserrat Medium"/"Montserrat SemiBold") — chỉ nên thêm nếu cập nhật
+`UiTheme` cho khớp, tránh `FirstOrDefault` chọn nhầm family.
 
 ## Fallback
 
-Nếu không có font ở đây, [UiTheme.cs](../../Theme/UiTheme.cs) sẽ:
-
-1. Thử tìm Montserrat đã cài trên hệ thống
-2. Cuối cùng fallback về `SystemFonts.DefaultFont` (Segoe UI)
-
-→ Ứng dụng vẫn build & chạy được kể cả khi quên copy font, chỉ là không có Montserrat.
-
-## Vì sao embed?
-
-- Build distributable không phụ thuộc máy người dùng đã cài Montserrat hay chưa
-- Đồng bộ giao diện qua mọi máy chấm đồ án
-- Font đi kèm assembly trong file `HospitalApp.exe` duy nhất
+Nếu vì lý do nào đó không nạp được font ở đây, `UiTheme` sẽ:
+1. Thử Montserrat đã cài trên hệ thống.
+2. Cuối cùng fallback `SystemFonts.DefaultFont` (Segoe UI) — app vẫn chạy bình thường, tiếng Việt vẫn đúng.

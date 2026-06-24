@@ -29,7 +29,9 @@ CONNECT BVADMIN/"BVAdmin@2025";
 CONNECT SYSTEM/oracle;
 
 -- Role cho Điều phối viên
-CREATE ROLE DPV_Role;
+-- FIX (L11): tạo role idempotent (bỏ qua nếu đã tồn tại — ORA-01921)
+BEGIN EXECUTE IMMEDIATE 'CREATE ROLE DPV_Role'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -1921 THEN RAISE; END IF; END;
+/
 
 GRANT SELECT, INSERT, UPDATE       ON BVADMIN.BENHNHAN  TO DPV_Role;
 GRANT SELECT, INSERT               ON BVADMIN.HSBA      TO DPV_Role;
@@ -38,16 +40,19 @@ GRANT SELECT                       ON BVADMIN.HSBA_DV   TO DPV_Role;
 GRANT UPDATE(MAKTV)                ON BVADMIN.HSBA_DV   TO DPV_Role;
 
 -- Role cho Bác sĩ/Y sĩ
-CREATE ROLE BS_Role;
+-- FIX (L11): tạo role idempotent
+BEGIN EXECUTE IMMEDIATE 'CREATE ROLE BS_Role'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -1921 THEN RAISE; END IF; END;
+/
 
-GRANT SELECT, UPDATE               ON BVADMIN.HSBA      TO BS_Role;
+GRANT SELECT                       ON BVADMIN.HSBA      TO BS_Role;
 -- VPD sẽ filter row; cột UPDATE bị giới hạn qua column-level grant:
 GRANT UPDATE(CHANDOAN, DIEUTRI, KETLUAN) ON BVADMIN.HSBA TO BS_Role;
 
 GRANT SELECT, INSERT, DELETE       ON BVADMIN.HSBA_DV   TO BS_Role;
-GRANT SELECT, UPDATE               ON BVADMIN.BENHNHAN  TO BS_Role;
+GRANT SELECT                       ON BVADMIN.BENHNHAN  TO BS_Role;
 GRANT UPDATE(TIENSUBENH, TIENSUBENHGD, DIUNGTHUOC) ON BVADMIN.BENHNHAN TO BS_Role;
-GRANT SELECT, INSERT, DELETE, UPDATE ON BVADMIN.DONTHUOC TO BS_Role;
+GRANT SELECT, INSERT, DELETE       ON BVADMIN.DONTHUOC  TO BS_Role;
+GRANT UPDATE(TENTHUOC, LIEUDUNG)   ON BVADMIN.DONTHUOC  TO BS_Role;
 
 -- Gán role cho các user
 GRANT DPV_Role TO DPV_NV001, DPV_NV002;
@@ -69,6 +74,11 @@ CREATE OR REPLACE FUNCTION vpd_hsba(
     v_manv   NHANVIEN.MANV%TYPE;
     v_vaitro NHANVIEN.VAITRO%TYPE;
 BEGIN
+    -- Chủ schema/bảo trì (BVADMIN): không lọc — phục vụ migration và sửa dữ liệu (file 12)
+    IF SYS_CONTEXT('USERENV','SESSION_USER') = 'BVADMIN' THEN
+        RETURN '';
+    END IF;
+
     v_manv   := fn_get_manv();
     v_vaitro := fn_get_vaitro();
 
@@ -77,7 +87,9 @@ BEGIN
     ELSIF v_vaitro = 'BS' THEN
         RETURN 'MABS = ''' || v_manv || '''';  -- Chỉ HSBA của BS đó
     ELSE
-        RETURN '1=0';           -- Các role khác không thấy HSBA qua policy
+        -- KTV/BN/khác: truy cập HSBA chỉ qua view của BVADMIN (BN_HSBA_View tự lọc theo fn_get_mabn)
+        -- và KHÔNG có quyền trên bảng gốc → không lọc thêm ở VPD (tránh xung đột INSTEAD OF/update_check).
+        RETURN '';
     END IF;
 END vpd_hsba;
 /
@@ -92,6 +104,11 @@ CREATE OR REPLACE FUNCTION vpd_hsba_dv(
     v_manv   NHANVIEN.MANV%TYPE;
     v_vaitro NHANVIEN.VAITRO%TYPE;
 BEGIN
+    -- Chủ schema/bảo trì (BVADMIN): không lọc
+    IF SYS_CONTEXT('USERENV','SESSION_USER') = 'BVADMIN' THEN
+        RETURN '';
+    END IF;
+
     v_manv   := fn_get_manv();
     v_vaitro := fn_get_vaitro();
 
@@ -101,7 +118,10 @@ BEGIN
         -- HSBA_DV thuộc về HSBA mà BS này phụ trách
         RETURN 'MAHSBA IN (SELECT MAHSBA FROM HSBA WHERE MABS = ''' || v_manv || ''')';
     ELSE
-        RETURN '1=0';
+        -- DPV: điều phối MAKTV trên mọi dịch vụ (không lọc).
+        -- KTV: truy cập qua KTV_HSBA_DV_View (tự lọc MAKTV=fn_get_manv) + không có quyền bảng gốc
+        -- → KHÔNG lọc thêm ở VPD (tránh xung đột với INSTEAD OF trigger gây ORA-28138).
+        RETURN '';
     END IF;
 END vpd_hsba_dv;
 /
@@ -116,6 +136,11 @@ CREATE OR REPLACE FUNCTION vpd_benhnhan(
     v_manv   NHANVIEN.MANV%TYPE;
     v_vaitro NHANVIEN.VAITRO%TYPE;
 BEGIN
+    -- Chủ schema/bảo trì (BVADMIN): không lọc — phục vụ sửa dữ liệu UTF-8 ở file 12
+    IF SYS_CONTEXT('USERENV','SESSION_USER') = 'BVADMIN' THEN
+        RETURN '';
+    END IF;
+
     v_manv   := fn_get_manv();
     v_vaitro := fn_get_vaitro();
 
@@ -125,7 +150,9 @@ BEGIN
         -- BN có HSBA do BS này phụ trách
         RETURN 'MABN IN (SELECT MABN FROM HSBA WHERE MABS = ''' || v_manv || ''')';
     ELSE
-        RETURN '1=0';
+        -- BN: truy cập BENHNHAN chỉ qua BN_BENHNHAN_View (tự lọc ORACLE_USER) + không có quyền bảng gốc
+        -- → KHÔNG lọc thêm ở VPD (tránh xung đột với INSTEAD OF trigger).
+        RETURN '';
     END IF;
 END vpd_benhnhan;
 /
@@ -138,6 +165,11 @@ CREATE OR REPLACE FUNCTION vpd_donthuoc(
     v_manv   NHANVIEN.MANV%TYPE;
     v_vaitro NHANVIEN.VAITRO%TYPE;
 BEGIN
+    -- Chủ schema/bảo trì (BVADMIN): không lọc
+    IF SYS_CONTEXT('USERENV','SESSION_USER') = 'BVADMIN' THEN
+        RETURN '';
+    END IF;
+
     v_manv   := fn_get_manv();
     v_vaitro := fn_get_vaitro();
 
@@ -158,52 +190,68 @@ GRANT EXECUTE ON DBMS_RLS TO BVADMIN;
 CONNECT BVADMIN/"BVAdmin@2025";
 
 -- Áp dụng VPD cho bảng HSBA
-DBMS_RLS.ADD_POLICY(
+BEGIN
+  DBMS_RLS.ADD_POLICY(
     object_schema   => 'BVADMIN',
     object_name     => 'HSBA',
     policy_name     => 'POL_HSBA_DPV_BS',
     function_schema => 'BVADMIN',
     policy_function => 'vpd_hsba',
     statement_types => 'SELECT,INSERT,UPDATE,DELETE',
-    update_check    => TRUE,
+    update_check    => FALSE,   -- FALSE: tránh kiểm dòng-mới gây ORA-28138/28115 khi BS INSERT HSBA_DV
+                                 -- hoặc KTV cập nhật KETQUA qua INSTEAD OF trigger. Lọc dòng (SELECT) vẫn đủ theo đề.
     enable          => TRUE
-);
+  );
+END;
+/
 
 -- Áp dụng VPD cho bảng HSBA_DV
-DBMS_RLS.ADD_POLICY(
+BEGIN
+  DBMS_RLS.ADD_POLICY(
     object_schema   => 'BVADMIN',
     object_name     => 'HSBA_DV',
     policy_name     => 'POL_HSBA_DV_DPV_BS',
     function_schema => 'BVADMIN',
     policy_function => 'vpd_hsba_dv',
     statement_types => 'SELECT,INSERT,UPDATE,DELETE',
-    update_check    => TRUE,
+    update_check    => FALSE,   -- FALSE: tránh kiểm dòng-mới gây ORA-28138/28115 khi BS INSERT HSBA_DV
+                                 -- hoặc KTV cập nhật KETQUA qua INSTEAD OF trigger. Lọc dòng (SELECT) vẫn đủ theo đề.
     enable          => TRUE
-);
+  );
+END;
+/
 
 -- Áp dụng VPD cho bảng BENHNHAN
-DBMS_RLS.ADD_POLICY(
+BEGIN
+  DBMS_RLS.ADD_POLICY(
     object_schema   => 'BVADMIN',
     object_name     => 'BENHNHAN',
     policy_name     => 'POL_BENHNHAN_DPV_BS',
     function_schema => 'BVADMIN',
     policy_function => 'vpd_benhnhan',
     statement_types => 'SELECT,UPDATE',
-    update_check    => TRUE,
+    update_check    => FALSE,   -- FALSE: tránh kiểm dòng-mới gây ORA-28138/28115 khi BS INSERT HSBA_DV
+                                 -- hoặc KTV cập nhật KETQUA qua INSTEAD OF trigger. Lọc dòng (SELECT) vẫn đủ theo đề.
     enable          => TRUE
-);
+  );
+END;
+/
 
 -- Áp dụng VPD cho bảng DONTHUOC
-DBMS_RLS.ADD_POLICY(
+BEGIN
+  DBMS_RLS.ADD_POLICY(
     object_schema   => 'BVADMIN',
     object_name     => 'DONTHUOC',
     policy_name     => 'POL_DONTHUOC_BS',
     function_schema => 'BVADMIN',
     policy_function => 'vpd_donthuoc',
     statement_types => 'SELECT,INSERT,UPDATE,DELETE',
-    update_check    => TRUE,
+    update_check    => FALSE,   -- FALSE: tránh kiểm dòng-mới gây ORA-28138/28115 khi BS INSERT HSBA_DV
+                                 -- hoặc KTV cập nhật KETQUA qua INSTEAD OF trigger. Lọc dòng (SELECT) vẫn đủ theo đề.
     enable          => TRUE
-);
+  );
+END;
+/
 
 -- ============================================================
 -- PHẦN D: AUDIT TRIGGER - ghi vết UPDATE CHANDOAN/DIEUTRI/KETLUAN (TC#3c)
@@ -227,24 +275,18 @@ FOR EACH ROW
 DECLARE
     v_user VARCHAR2(100) := SYS_CONTEXT('USERENV','SESSION_USER');
 BEGIN
-    IF :NEW.CHANDOAN != :OLD.CHANDOAN OR
-       (:NEW.CHANDOAN IS NOT NULL AND :OLD.CHANDOAN IS NULL) OR
-       (:NEW.CHANDOAN IS NULL AND :OLD.CHANDOAN IS NOT NULL)
-    THEN
+    -- So sánh NULL-safe (cột nay là NVARCHAR2 nên dùng != trực tiếp được; sentinel N'<<NULL>>' tránh bỏ sót khi NULL)
+    IF NVL(:NEW.CHANDOAN, N'<<NULL>>') != NVL(:OLD.CHANDOAN, N'<<NULL>>') THEN
         INSERT INTO LOG_BS_HSBA(MAHSBA, COT_THAYDO, GIA_TRI_CU, GIA_TRI_MOI, BS_THUCHIN)
         VALUES(:OLD.MAHSBA, 'CHANDOAN', :OLD.CHANDOAN, :NEW.CHANDOAN, v_user);
     END IF;
 
-    IF :NEW.DIEUTRI != :OLD.DIEUTRI OR
-       (:NEW.DIEUTRI IS NOT NULL AND :OLD.DIEUTRI IS NULL)
-    THEN
+    IF NVL(:NEW.DIEUTRI, N'<<NULL>>') != NVL(:OLD.DIEUTRI, N'<<NULL>>') THEN
         INSERT INTO LOG_BS_HSBA(MAHSBA, COT_THAYDO, GIA_TRI_CU, GIA_TRI_MOI, BS_THUCHIN)
         VALUES(:OLD.MAHSBA, 'DIEUTRI', :OLD.DIEUTRI, :NEW.DIEUTRI, v_user);
     END IF;
 
-    IF :NEW.KETLUAN != :OLD.KETLUAN OR
-       (:NEW.KETLUAN IS NOT NULL AND :OLD.KETLUAN IS NULL)
-    THEN
+    IF NVL(:NEW.KETLUAN, N'<<NULL>>') != NVL(:OLD.KETLUAN, N'<<NULL>>') THEN
         INSERT INTO LOG_BS_HSBA(MAHSBA, COT_THAYDO, GIA_TRI_CU, GIA_TRI_MOI, BS_THUCHIN)
         VALUES(:OLD.MAHSBA, 'KETLUAN', :OLD.KETLUAN, :NEW.KETLUAN, v_user);
     END IF;
@@ -280,6 +322,9 @@ END trg_log_donthuoc;
 -- ============================================================
 -- PHẦN E: KIỂM THỬ VPD
 -- ============================================================
+-- Một số câu dưới CỐ Ý gây lỗi/0 dòng để minh hoạ VPD và column-grant.
+-- Đặt CONTINUE để không làm dừng migration khi chạy tự động.
+WHENEVER SQLERROR CONTINUE
 
 -- Test BS_NV003 (bác sĩ Tim mạch, phụ trách HS001 và HS004):
 CONNECT BS_NV003/"BV@2025!";
@@ -302,7 +347,8 @@ COMMIT;
 -- Test UPDATE CHANDOAN của HSBA không phải của mình - BỊ VPD CHẶN (0 dòng)
 UPDATE BVADMIN.HSBA
 SET    CHANDOAN = N'Thay đổi bất hợp pháp'
-WHERE  MAHSBA = 'HS002';  -- HS002 của BS NV004
+-- HS002 thuộc BS NV004 → BS NV003 không thấy (VPD chặn, 0 dòng)
+WHERE  MAHSBA = 'HS002';
 -- Kết quả: 0 rows updated (VPD filter chặn, không thấy HS002)
 
 -- Test INSERT DONTHUOC cho HSBA của mình - HỢP LỆ

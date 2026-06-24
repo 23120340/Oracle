@@ -1,4 +1,4 @@
-using HospitalApp.Controls;
+﻿using HospitalApp.Controls;
 using HospitalApp.Database;
 using HospitalApp.Security;
 using HospitalApp.Theme;
@@ -45,7 +45,6 @@ public class OLSViewerForm : Form
                     MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                     Close();
             });
-        Controls.Add(header);
         var body = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -55,13 +54,15 @@ public class OLSViewerForm : Form
             Padding = Padding.Empty,
             BackColor = UiTheme.BgLight
         };
-        body.RowStyles.Add(new RowStyle(SizeType.Absolute, 108));
+        body.RowStyles.Add(new RowStyle(SizeType.Absolute, 116));
         body.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
         body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         body.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        // FIX: thêm body (Fill) TRƯỚC, header (Top) SAU → header chiếm phần trên, body nằm dưới
+        // (trước đây body bị vẽ đè dưới header làm dòng "Nhãn/Tổng N thông báo" lệch lên/khuất).
         Controls.Add(body);
-        header.BringToFront();
+        Controls.Add(header);
 
         // Info bar: nhãn OLS hiện tại
         var info = new Panel
@@ -121,7 +122,7 @@ public class OLSViewerForm : Form
         // Status bar
         var status = new StatusBar
         {
-            LeftText   = $"{IconRegistry.Database}  {_db.Host}:{_db.Port}/{_db.Sid}",
+            LeftText   = $"{_db.Host}:{_db.Port}/{_db.Sid}",
             CenterText = $"{_db.Username}  ·  OLS Viewer"
         };
         status.Dock = DockStyle.Fill;
@@ -146,7 +147,7 @@ public class OLSViewerForm : Form
             var dt = QueryThongBao();
             /*
             var oldDt = _db.Query(
-                "SELECT MATB, SUBSTR(TO_CHAR(NOIDUNG), 1, 150) AS NOIDUNG, " +
+                "SELECT MATB, SUBSTR(TO_NCHAR(NOIDUNG), 1, 150) AS NOIDUNG, " +
                 "TO_CHAR(NGAYGIO, 'DD/MM/YYYY HH24:MI') AS NGAYGIO, DIADIEM " +
                 "FROM BVADMIN.THONGBAO ORDER BY NGAYGIO DESC");
             */
@@ -168,8 +169,7 @@ public class OLSViewerForm : Form
         try
         {
             return _db.Scalar(
-                "SELECT MAX_READ_LABEL FROM DBA_SA_USER_LABELS " +
-                "WHERE POLICY_NAME = 'BV_LABEL_POLICY' AND USER_NAME = USER")?.ToString()
+                "SELECT LBACSYS.fn_my_ols_label('BV_LABEL_POLICY') FROM DUAL")?.ToString()
                 ?? "(chưa được cấp nhãn)";
         }
         catch
@@ -183,14 +183,14 @@ public class OLSViewerForm : Form
         try
         {
             return _db.Query(
-                "SELECT MATB, SUBSTR(TO_CHAR(NOIDUNG), 1, 150) AS NOIDUNG, " +
+                "SELECT MATB, SUBSTR(TO_NCHAR(NOIDUNG), 1, 150) AS NOIDUNG, " +
                 "TO_CHAR(NGAYGIO, 'DD/MM/YYYY HH24:MI') AS NGAYGIO, DIADIEM " +
                 "FROM BVADMIN.THONGBAO ORDER BY NGAYGIO DESC");
         }
         catch
         {
             return _db.Query(
-                "SELECT MATB, SUBSTR(TO_CHAR(NOIDUNG), 1, 150) AS NOIDUNG, " +
+                "SELECT MATB, SUBSTR(TO_NCHAR(NOIDUNG), 1, 150) AS NOIDUNG, " +
                 "TO_CHAR(NGAYGIO, 'DD/MM/YYYY HH24:MI') AS NGAYGIO, DIADIEM " +
                 "FROM THONGBAO ORDER BY NGAYGIO DESC");
         }

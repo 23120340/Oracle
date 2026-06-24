@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using HospitalApp.Controls;
 using HospitalApp.Database;
 using HospitalApp.Security;
@@ -176,7 +176,7 @@ public class AdminDashboard : Form
         // Status bar
         var status = new StatusBar
         {
-            LeftText   = $"{IconRegistry.Database}  {_db.Host}:{_db.Port}/{_db.Sid}",
+            LeftText   = $"{_db.Host}:{_db.Port}/{_db.Sid}",
             CenterText = $"Đã đăng nhập: {_db.Username}  ·  Vai trò: DBA"
         };
 
@@ -939,11 +939,23 @@ public class AdminDashboard : Form
         _btnRevoke.Click += BtnRevoke_Click;
         botPanel.Controls.Add(_btnRevoke);
 
-        page.Controls.Add(_dgvGranted);
-        page.Controls.Add(botPanel);
-        page.Controls.Add(topPanel);
-        botPanel.BringToFront();
-        topPanel.BringToFront();
+        // FIX: dùng TableLayoutPanel (lọc / bảng-Fill / nút) để bảng quyền hiển thị tối đa, không bị che
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3,
+            Margin = Padding.Empty, Padding = Padding.Empty
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        topPanel.Dock = DockStyle.Fill;   topPanel.Margin = Padding.Empty;
+        _dgvGranted.Margin = Padding.Empty;
+        botPanel.Dock = DockStyle.Fill;   botPanel.Margin = Padding.Empty;
+        layout.Controls.Add(topPanel,    0, 0);
+        layout.Controls.Add(_dgvGranted, 0, 1);
+        layout.Controls.Add(botPanel,    0, 2);
+        page.Controls.Add(layout);
 
         page.Enter += (_, _) => RefreshRevokeGrantees();
         return page;

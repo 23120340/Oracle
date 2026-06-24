@@ -1,4 +1,4 @@
-namespace HospitalApp.Theme;
+﻿namespace HospitalApp.Theme;
 
 /// <summary>
 /// Helper animation pure manual với System.Windows.Forms.Timer.

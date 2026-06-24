@@ -1,4 +1,4 @@
-using Oracle.ManagedDataAccess.Client;
+﻿using Oracle.ManagedDataAccess.Client;
 using System.Data;
 using System.Text.RegularExpressions;
 
@@ -184,6 +184,13 @@ public class OracleHelper
     }
 
     // ── OracleParameter helpers ────────────────────────────────────────────────
+    // Bind chuỗi dưới dạng NVarchar2 (national charset = Unicode/AL16UTF16) để tiếng Việt
+    // LUÔN round-trip đúng với cột NVARCHAR2/NCLOB, kể cả khi DB charset không phải AL32UTF8.
+    // (Mặc định OracleParameter suy ra Varchar2 từ string → có thể hỏng dấu khi ghi.)
     public static OracleParameter Param(string name, object? value)
-        => new(name, value ?? DBNull.Value);
+    {
+        var p = new OracleParameter(name, value ?? DBNull.Value);
+        if (value is string) p.OracleDbType = OracleDbType.NVarchar2;
+        return p;
+    }
 }

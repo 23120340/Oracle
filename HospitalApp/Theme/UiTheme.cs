@@ -1,4 +1,4 @@
-using System.Drawing.Text;
+﻿using System.Drawing.Text;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -276,7 +276,7 @@ public static class UiTheme
         {
             btn = new Button
             {
-                Text = "⏻  Đăng xuất",
+                Text = "Đăng xuất",   // FIX UI: bỏ ký hiệu ⏻ (U+23FB) — Montserrat không có glyph này → tofu
                 Dock = DockStyle.Right, Width = 140,
                 BackColor = btnDark, ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,

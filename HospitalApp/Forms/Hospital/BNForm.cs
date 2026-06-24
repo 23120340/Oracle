@@ -1,4 +1,4 @@
-using HospitalApp.Controls;
+﻿using HospitalApp.Controls;
 using HospitalApp.Database;
 using HospitalApp.Security;
 using HospitalApp.Theme;
@@ -79,7 +79,7 @@ public class BNForm : Form
 
         var status = new StatusBar
         {
-            LeftText   = $"{IconRegistry.Database}  {_db.Host}:{_db.Port}/{_db.Sid}",
+            LeftText   = $"{_db.Host}:{_db.Port}/{_db.Sid}",
             CenterText = $"{_db.Username}  ·  Bệnh nhân"
         };
 
@@ -347,7 +347,7 @@ public class BNForm : Form
             var dt = _db.Query(
                 "SELECT MABN, TENBN, PHAI, TO_CHAR(NGAYSINH,'DD/MM/YYYY') AS NGAYSINH, " +
                 "CCCD, SONHA, TENDUONG, QUANHUYEN, TINHTP, " +
-                "TO_CHAR(TIENSUBENH) AS TSB, TO_CHAR(TIENSUBENHGD) AS TSBGD, DIUNGTHUOC " +
+                "TO_NCHAR(TIENSUBENH) AS TSB, TO_NCHAR(TIENSUBENHGD) AS TSBGD, DIUNGTHUOC " +
                 "FROM BVADMIN.BN_BENHNHAN_View");
 
             if (dt.Rows.Count == 0)
@@ -431,7 +431,7 @@ public class BNForm : Form
             // Ẩn CHANDOAN/DIEUTRI (chỉ BS/bác sĩ mới được xem chi tiết)
             _dgvHSBA.DataSource = _db.Query(
                 "SELECT MAHSBA, TO_CHAR(NGAY,'DD/MM/YYYY') AS NGAY, MAKHOA, " +
-                "SUBSTR(TO_CHAR(KETLUAN),1,100) AS KETLUAN " +
+                "SUBSTR(TO_NCHAR(KETLUAN),1,100) AS KETLUAN " +
                 "FROM BVADMIN.BN_HSBA_View ORDER BY NGAY DESC");
         });
 
@@ -481,7 +481,7 @@ public class BNForm : Form
         {
             // OLS tự filter nhãn → BN chỉ thấy thông báo phù hợp với label của mình
             _dgvTB.DataSource = _db.Query(
-                "SELECT MATB, SUBSTR(TO_CHAR(NOIDUNG),1,120) AS NOIDUNG, " +
+                "SELECT MATB, SUBSTR(TO_NCHAR(NOIDUNG),1,120) AS NOIDUNG, " +
                 "TO_CHAR(NGAYGIO,'DD/MM/YYYY HH24:MI') AS NGAYGIO, DIADIEM " +
                 "FROM BVADMIN.THONGBAO ORDER BY NGAYGIO DESC");
         });

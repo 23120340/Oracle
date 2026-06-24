@@ -1,4 +1,4 @@
-namespace HospitalApp.Controls;
+﻿namespace HospitalApp.Controls;
 
 /// <summary>
 /// Helper gắn keyboard shortcuts chuẩn cho mọi form chính.

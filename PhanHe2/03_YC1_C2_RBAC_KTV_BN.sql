@@ -44,10 +44,11 @@ DECLARE
     v_manv NHANVIEN.MANV%TYPE := BVADMIN.fn_get_manv();
 BEGIN
     -- Kiểm tra: KTV chỉ được update KETQUA
+    -- So sánh NULL-safe cho cột có thể NULL (MAKTV); MAHSBA/LOAIDV/NGAYDV thuộc PK nên NOT NULL
     IF :NEW.MAHSBA  != :OLD.MAHSBA
     OR :NEW.LOAIDV  != :OLD.LOAIDV
     OR :NEW.NGAYDV  != :OLD.NGAYDV
-    OR :NEW.MAKTV   != :OLD.MAKTV
+    OR NVL(:NEW.MAKTV, '∅') != NVL(:OLD.MAKTV, '∅')
     THEN
         RAISE_APPLICATION_ERROR(-20001,
             N'KTV chỉ được cập nhật cột KETQUA.');
@@ -81,24 +82,34 @@ CREATE OR REPLACE TRIGGER trg_log_ketqua
 AFTER UPDATE OF KETQUA ON HSBA_DV
 FOR EACH ROW
 BEGIN
-    INSERT INTO LOG_KTV_KETQUA
-        (MAHSBA, LOAIDV, NGAYDV, MAKTV, OLD_KETQUA, NEW_KETQUA, CHANGED_BY)
-    VALUES
-        (:OLD.MAHSBA, :OLD.LOAIDV, :OLD.NGAYDV, :OLD.MAKTV,
-         :OLD.KETQUA, :NEW.KETQUA,
-         SYS_CONTEXT('USERENV','SESSION_USER'));
+    -- FIX (L7): chỉ ghi vết khi KETQUA THỰC SỰ đổi (KETQUA nay là NVARCHAR2 → so sánh NULL-safe được)
+    IF NVL(:NEW.KETQUA, N'<<NULL>>') != NVL(:OLD.KETQUA, N'<<NULL>>') THEN
+        INSERT INTO LOG_KTV_KETQUA
+            (MAHSBA, LOAIDV, NGAYDV, MAKTV, OLD_KETQUA, NEW_KETQUA, CHANGED_BY)
+        VALUES
+            (:OLD.MAHSBA, :OLD.LOAIDV, :OLD.NGAYDV, :OLD.MAKTV,
+             :OLD.KETQUA, :NEW.KETQUA,
+             SYS_CONTEXT('USERENV','SESSION_USER'));
+    END IF;
 END trg_log_ketqua;
 /
 
 -- A4. Tạo role KTV_Role và cấp quyền chỉ trên view
 CONNECT SYSTEM/oracle;
-CREATE ROLE KTV_Role;
+-- FIX (L11): tạo role idempotent (bỏ qua nếu đã tồn tại — ORA-01921) để chạy lại an toàn
+BEGIN EXECUTE IMMEDIATE 'CREATE ROLE KTV_Role'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -1921 THEN RAISE; END IF; END;
+/
 GRANT SELECT ON BVADMIN.KTV_HSBA_DV_View TO KTV_Role;
-GRANT UPDATE ON BVADMIN.KTV_HSBA_DV_View TO KTV_Role;  -- INSTEAD OF trigger xử lý
+-- GRANT UPDATE: INSTEAD OF trigger sẽ xử lý giới hạn cột (chỉ KETQUA)
+GRANT UPDATE ON BVADMIN.KTV_HSBA_DV_View TO KTV_Role;
 
 -- Gán role cho các KTV
 GRANT KTV_Role TO KTV_NV006;
 GRANT KTV_Role TO KTV_NV007;
+
+-- FIX (B6): KTV cần quyền CREATE SYNONYM để tự tạo synonym (mặc định chỉ có CREATE SESSION)
+GRANT CREATE SYNONYM TO KTV_NV006;
+GRANT CREATE SYNONYM TO KTV_NV007;
 
 -- Tạo synonym cho KTV dễ truy cập (không cần tiền tố BVADMIN)
 CONNECT KTV_NV006/"BV@2025!";
@@ -126,10 +137,11 @@ INSTEAD OF UPDATE ON BN_BENHNHAN_View
 FOR EACH ROW
 BEGIN
     -- Kiểm tra: không được đổi các trường định danh và cố định
+    -- So sánh NULL-safe cho cột có thể NULL (PHAI, NGAYSINH) để không bỏ sót thay đổi từ/ sang NULL
     IF :NEW.MABN     != :OLD.MABN
     OR :NEW.TENBN    != :OLD.TENBN
-    OR :NEW.PHAI     != :OLD.PHAI
-    OR :NEW.NGAYSINH != :OLD.NGAYSINH
+    OR NVL(:NEW.PHAI, '∅') != NVL(:OLD.PHAI, '∅')
+    OR NVL(:NEW.NGAYSINH, DATE'0001-01-01') != NVL(:OLD.NGAYSINH, DATE'0001-01-01')
     OR :NEW.CCCD     != :OLD.CCCD
     THEN
         RAISE_APPLICATION_ERROR(-20002,
@@ -160,14 +172,17 @@ SELECT
     h.KETLUAN
     -- CHANDOAN, DIEUTRI ẩn đi (thông tin nhạy cảm của bác sĩ)
 FROM HSBA h
-JOIN BENHNHAN b ON h.MABN = b.MABN
-WHERE b.ORACLE_USER = SYS_CONTEXT('USERENV','SESSION_USER');
+-- FIX (RBAC-6): lọc 1 bảng, bám TC#1 "không join >1 bảng"
+WHERE h.MABN = BVADMIN.fn_get_mabn();
 
 -- B4. Tạo role BenhNhan_Role và cấp quyền chỉ trên view
 CONNECT SYSTEM/oracle;
-CREATE ROLE BenhNhan_Role;
+-- FIX (L11): tạo role idempotent
+BEGIN EXECUTE IMMEDIATE 'CREATE ROLE BenhNhan_Role'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -1921 THEN RAISE; END IF; END;
+/
 GRANT SELECT ON BVADMIN.BN_BENHNHAN_View TO BenhNhan_Role;
-GRANT UPDATE ON BVADMIN.BN_BENHNHAN_View TO BenhNhan_Role;  -- trigger xử lý
+-- GRANT UPDATE: INSTEAD OF trigger sẽ xử lý giới hạn cột được sửa
+GRANT UPDATE ON BVADMIN.BN_BENHNHAN_View TO BenhNhan_Role;
 GRANT SELECT ON BVADMIN.BN_HSBA_View     TO BenhNhan_Role;
 
 -- Gán role cho bệnh nhân
@@ -178,6 +193,9 @@ GRANT BenhNhan_Role TO BN_BN003;
 -- ============================================================
 -- PHẦN C: KIỂM THỬ
 -- ============================================================
+-- Một số câu dưới đây CỐ Ý gây lỗi (ORA-20001/20002/01031) để minh hoạ chặn quyền.
+-- Đặt CONTINUE để khi chạy tự động (run_migrations) các lỗi minh hoạ không làm dừng script.
+WHENEVER SQLERROR CONTINUE
 
 -- Test KTV_NV006 (kỹ thuật viên):
 CONNECT KTV_NV006/"BV@2025!";

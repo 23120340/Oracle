@@ -1,4 +1,4 @@
-using System.Drawing.Drawing2D;
+﻿using System.Drawing.Drawing2D;
 using HospitalApp.Theme;
 
 namespace HospitalApp.Controls;
@@ -124,11 +124,12 @@ public class StatusBar : Panel
         _clock = new System.Windows.Forms.Timer { Interval = 1000 };
         _clock.Tick += (_, _) =>
         {
-            _lblRight.Text = $"{IconRegistry.Clock}  {DateTime.Now:HH:mm:ss}";
+            _lblRight.Text = DateTime.Now.ToString("HH:mm:ss");
         };
         _clock.Start();
-        _lblRight.Text = $"{IconRegistry.Clock}  {DateTime.Now:HH:mm:ss}";
-        _lblRight.Font = IconRegistry.Icon(9f);
+        _lblRight.Text = DateTime.Now.ToString("HH:mm:ss");
+        // FIX UI: giữ font body cho label giờ. Trước đây gán IconRegistry.Icon (Segoe Fluent Icons)
+        // cho cả label làm phần "HH:mm:ss" render bằng font icon → hiện ô vuông (tofu).
         Resize += (_, _) => LayoutLabels();
         LayoutLabels();
     }

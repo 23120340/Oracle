@@ -9,24 +9,25 @@
 -- ============================================================
 
 CONNECT BVADMIN/"BVAdmin@2025";
+SET DEFINE OFF
+-- (tránh '&' bị hiểu là biến thay thế; KHÔNG đặt ';' sau SET → tránh SP2-0158)
 
 -- Them cot theo cach idempotent de co the chay lai khi demo.
+-- FIX (L5): kiểm tra và thêm TỪNG cột (idempotent thật sự, an toàn khi chạy lại sau lỗi giữa chừng)
 DECLARE
-    v_count NUMBER;
+    PROCEDURE add_col_if_missing(p_col VARCHAR2, p_ddl VARCHAR2) IS
+        v_cnt NUMBER;
+    BEGIN
+        SELECT COUNT(*) INTO v_cnt FROM USER_TAB_COLUMNS
+        WHERE TABLE_NAME = 'NHANVIEN' AND COLUMN_NAME = p_col;
+        IF v_cnt = 0 THEN
+            EXECUTE IMMEDIATE 'ALTER TABLE NHANVIEN ADD ' || p_ddl;
+        END IF;
+    END;
 BEGIN
-    SELECT COUNT(*) INTO v_count
-    FROM USER_TAB_COLUMNS
-    WHERE TABLE_NAME = 'NHANVIEN' AND COLUMN_NAME = 'CAPBAC';
-
-    IF v_count = 0 THEN
-        EXECUTE IMMEDIATE q'[
-            ALTER TABLE NHANVIEN ADD (
-                CAPBAC    VARCHAR2(10) CHECK (CAPBAC IN ('NV','LDK','BGD')),
-                COSO      VARCHAR2(10) CHECK (COSO IN ('HCM','HPN','HNI')),
-                KHOA_NHAN VARCHAR2(10) CHECK (KHOA_NHAN IN ('TH','TK','TM','ALL'))
-            )
-        ]';
-    END IF;
+    add_col_if_missing('CAPBAC',    'CAPBAC VARCHAR2(10) CHECK (CAPBAC IN (''NV'',''LDK'',''BGD''))');
+    add_col_if_missing('COSO',      'COSO VARCHAR2(10) CHECK (COSO IN (''HCM'',''HPN'',''HNI''))');
+    add_col_if_missing('KHOA_NHAN', 'KHOA_NHAN VARCHAR2(10) CHECK (KHOA_NHAN IN (''TH'',''TK'',''TM'',''ALL''))');
 END;
 /
 
@@ -52,13 +53,14 @@ CREATE OR REPLACE TRIGGER trg_nv_update_self
 INSTEAD OF UPDATE ON NV_NHANVIEN_View
 FOR EACH ROW
 BEGIN
+    -- So sánh NULL-safe cho mọi cột cấm sửa (PHAI/NGAYSINH/CHUYENKHOA có thể NULL → != trực tiếp bỏ sót)
     IF :NEW.MANV       != :OLD.MANV
     OR :NEW.HOTEN      != :OLD.HOTEN
-    OR :NEW.PHAI       != :OLD.PHAI
-    OR :NEW.NGAYSINH   != :OLD.NGAYSINH
+    OR NVL(:NEW.PHAI,      '#') != NVL(:OLD.PHAI,      '#')
+    OR NVL(:NEW.NGAYSINH, DATE'0001-01-01') != NVL(:OLD.NGAYSINH, DATE'0001-01-01')
     OR :NEW.CMND       != :OLD.CMND
     OR :NEW.VAITRO     != :OLD.VAITRO
-    OR :NEW.CHUYENKHOA != :OLD.CHUYENKHOA
+    OR NVL(:NEW.CHUYENKHOA,'#') != NVL(:OLD.CHUYENKHOA,'#')
     OR NVL(:NEW.CAPBAC,    '#') != NVL(:OLD.CAPBAC,    '#')
     OR NVL(:NEW.COSO,      '#') != NVL(:OLD.COSO,      '#')
     OR NVL(:NEW.KHOA_NHAN, '#') != NVL(:OLD.KHOA_NHAN, '#')
@@ -125,6 +127,24 @@ BEGIN
     END LOOP;
 END;
 /
+
+-- Hàm cho phép MỖI user đọc NHÃN OLS CỦA CHÍNH MÌNH mà không cần quyền trên DBA_SA_USER_LABELS.
+-- Definer = LBACSYS (có quyền đọc dictionary OLS); USER = user đang đăng nhập (login user).
+CREATE OR REPLACE FUNCTION fn_my_ols_label(
+    p_policy IN VARCHAR2 DEFAULT 'BV_LABEL_POLICY'
+) RETURN VARCHAR2 AS
+    v_label VARCHAR2(4000);
+BEGIN
+    SELECT MAX_READ_LABEL INTO v_label
+    FROM   DBA_SA_USER_LABELS
+    WHERE  POLICY_NAME = p_policy AND USER_NAME = USER;
+    RETURN v_label;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN RETURN '(chưa gán nhãn)';
+    WHEN OTHERS        THEN RETURN '(không đọc được nhãn)';
+END;
+/
+GRANT EXECUTE ON fn_my_ols_label TO PUBLIC;
 
 CONNECT SYSTEM/oracle;
 GRANT SELECT ON BVADMIN.THONGBAO TO DPV_Role;

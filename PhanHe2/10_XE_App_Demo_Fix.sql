@@ -4,7 +4,7 @@
 -- Muc tieu: dam bao login app Phan he 2 co user + role + ORACLE_USER.
 -- ============================================================
 
-CONNECT SYS/password AS SYSDBA;
+CONNECT SYS/&&sys_pwd AS SYSDBA;
 
 SET SERVEROUTPUT ON;
 

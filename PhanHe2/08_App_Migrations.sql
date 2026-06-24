@@ -35,47 +35,11 @@ GRANT EXECUTE ON fn_next_mabn   TO DPV_Role;
 
 -- ============================================================
 -- B. NV_NHANVIEN_View - Self-service cho nhân viên (TC#5)
--- Trên bảng NHANVIEN: chỉ thấy dòng của mình, chặn UPDATE các cột định danh
 -- ============================================================
-CREATE OR REPLACE VIEW NV_NHANVIEN_View AS
-SELECT
-    MANV, HOTEN, PHAI, NGAYSINH, CMND,
-    QUEQUAN, SODT, VAITRO, CHUYENKHOA
-FROM NHANVIEN
-WHERE ORACLE_USER = SYS_CONTEXT('USERENV','SESSION_USER');
-
--- INSTEAD OF trigger: chặn UPDATE các trường định danh & cố định
-CREATE OR REPLACE TRIGGER trg_nv_update_self
-INSTEAD OF UPDATE ON NV_NHANVIEN_View
-FOR EACH ROW
-BEGIN
-    IF :NEW.MANV       != :OLD.MANV
-    OR :NEW.HOTEN      != :OLD.HOTEN
-    OR :NEW.PHAI       != :OLD.PHAI
-    OR :NEW.NGAYSINH   != :OLD.NGAYSINH
-    OR :NEW.CMND       != :OLD.CMND
-    OR :NEW.VAITRO     != :OLD.VAITRO
-    OR :NEW.CHUYENKHOA != :OLD.CHUYENKHOA
-    THEN
-        RAISE_APPLICATION_ERROR(-20003,
-            N'Không được phép thay đổi MÃ NV, HỌ TÊN, PHÁI, NGÀY SINH, CMND, VAI TRÒ, CHUYÊN KHOA.');
-    END IF;
-
-    UPDATE NHANVIEN
-    SET    QUEQUAN = :NEW.QUEQUAN,
-           SODT    = :NEW.SODT
-    WHERE  ORACLE_USER = SYS_CONTEXT('USERENV','SESSION_USER');
-END trg_nv_update_self;
-/
-
--- Cấp quyền cho 3 role nhân sự
-CONNECT SYSTEM/oracle;
-GRANT SELECT ON BVADMIN.NV_NHANVIEN_View TO DPV_Role;
-GRANT UPDATE ON BVADMIN.NV_NHANVIEN_View TO DPV_Role;
-GRANT SELECT ON BVADMIN.NV_NHANVIEN_View TO BS_Role;
-GRANT UPDATE ON BVADMIN.NV_NHANVIEN_View TO BS_Role;
-GRANT SELECT ON BVADMIN.NV_NHANVIEN_View TO KTV_Role;
-GRANT UPDATE ON BVADMIN.NV_NHANVIEN_View TO KTV_Role;
+-- FIX (H2): View NV_NHANVIEN_View + trigger trg_nv_update_self + các GRANT cho
+-- DPV_Role/BS_Role/KTV_Role được định nghĩa DUY NHẤT ở 09_OLS_NhanVien_Unified.sql
+-- (bản 12 cột, gồm CAPBAC/COSO/KHOA_NHAN). Bỏ định nghĩa trùng tại đây để tránh
+-- phụ thuộc thứ tự chạy (08↔09 ghi đè lẫn nhau). Xem file 09.
 
 -- ============================================================
 -- C. APP_LOGIN_LOG - log đăng nhập tại app layer (bổ sung cho DB audit)

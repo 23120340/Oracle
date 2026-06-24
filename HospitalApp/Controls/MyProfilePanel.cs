@@ -1,4 +1,4 @@
-using HospitalApp.Database;
+﻿using HospitalApp.Database;
 using HospitalApp.Security;
 using HospitalApp.Theme;
 

@@ -18,6 +18,9 @@
 -- Chạy với SYS hoặc LBACSYS
 -- ============================================================
 
+SET DEFINE OFF
+-- (tránh '&' trong chuỗi bị hiểu là biến thay thế; KHÔNG đặt ';' sau SET → tránh SP2-0158)
+
 -- ============================================================
 -- BƯỚC 1: Tạo policy OLS
 -- ============================================================
@@ -172,147 +175,105 @@ END;
 -- ============================================================
 -- BƯỚC 7: Tạo user u1–u8 và thiết lập nhãn
 -- ============================================================
--- u1: Giám đốc - đọc được toàn bộ
-CREATE USER u1_giamdoc IDENTIFIED BY "U1@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
-GRANT CREATE SESSION TO u1_giamdoc;
-GRANT SELECT ON BVADMIN.THONGBAO TO u1_giamdoc;
+-- 7a. Tạo user + cấp quyền — chạy bằng SYSTEM/DBA (LBACSYS KHÔNG có CREATE USER)
+CONNECT SYSTEM/oracle;
 
-SA_USER_ADMIN.SET_USER_LABELS(
-    policy_name    => 'BV_LABEL_POLICY',
-    user_name      => 'U1_GIAMDOC',
-    max_read_label => 'BGD:HCM,HPN,HNI:TH,TK,TM'  -- Đọc mọi nhãn
-);
-
--- u2: Lãnh đạo Khoa tim mạch tại HCM
-CREATE USER u2_ldtm_hcm IDENTIFIED BY "U2@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
-GRANT CREATE SESSION TO u2_ldtm_hcm;
-GRANT SELECT ON BVADMIN.THONGBAO TO u2_ldtm_hcm;
-
-SA_USER_ADMIN.SET_USER_LABELS(
-    policy_name    => 'BV_LABEL_POLICY',
-    user_name      => 'U2_LDTM_HCM',
-    max_read_label => 'LDK:HCM:TM'
-);
-
--- u3: Lãnh đạo Khoa thần kinh tại Hà Nội
-CREATE USER u3_ldtk_hni IDENTIFIED BY "U3@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
-GRANT CREATE SESSION TO u3_ldtk_hni;
-GRANT SELECT ON BVADMIN.THONGBAO TO u3_ldtk_hni;
-
-SA_USER_ADMIN.SET_USER_LABELS(
-    policy_name    => 'BV_LABEL_POLICY',
-    user_name      => 'U3_LDTK_HNI',
-    max_read_label => 'LDK:HNI:TK'
-);
-
--- u4: Nhân viên Khoa thần kinh tại HCM
-CREATE USER u4_nvtk_hcm IDENTIFIED BY "U4@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
-GRANT CREATE SESSION TO u4_nvtk_hcm;
-GRANT SELECT ON BVADMIN.THONGBAO TO u4_nvtk_hcm;
-
-SA_USER_ADMIN.SET_USER_LABELS(
-    policy_name    => 'BV_LABEL_POLICY',
-    user_name      => 'U4_NVTK_HCM',
-    max_read_label => 'NV:HCM:TK'
-);
-
--- u5: Nhân viên Khoa tim mạch tại HCM
-CREATE USER u5_nvtm_hcm IDENTIFIED BY "U5@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
-GRANT CREATE SESSION TO u5_nvtm_hcm;
-GRANT SELECT ON BVADMIN.THONGBAO TO u5_nvtm_hcm;
-
-SA_USER_ADMIN.SET_USER_LABELS(
-    policy_name    => 'BV_LABEL_POLICY',
-    user_name      => 'U5_NVTM_HCM',
-    max_read_label => 'NV:HCM:TM'
-);
-
--- u6: Lãnh đạo phòng - Khoa tim mạch tại HCM
+CREATE USER u1_giamdoc    IDENTIFIED BY "U1@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
+CREATE USER u2_ldtm_hcm   IDENTIFIED BY "U2@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
+CREATE USER u3_ldtk_hni   IDENTIFIED BY "U3@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
+CREATE USER u4_nvtk_hcm   IDENTIFIED BY "U4@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
+CREATE USER u5_nvtm_hcm   IDENTIFIED BY "U5@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
 CREATE USER u6_ldp_tm_hcm IDENTIFIED BY "U6@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
-GRANT CREATE SESSION TO u6_ldp_tm_hcm;
-GRANT SELECT ON BVADMIN.THONGBAO TO u6_ldp_tm_hcm;
+CREATE USER u7_ldp_all    IDENTIFIED BY "U7@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
+CREATE USER u8_nvth_hni   IDENTIFIED BY "U8@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
 
-SA_USER_ADMIN.SET_USER_LABELS(
-    policy_name    => 'BV_LABEL_POLICY',
-    user_name      => 'U6_LDP_TM_HCM',
-    max_read_label => 'LDK:HCM:TM'    -- Lãnh đạo phòng TM tại HCM
-);
+GRANT CREATE SESSION TO u1_giamdoc, u2_ldtm_hcm, u3_ldtk_hni, u4_nvtk_hcm,
+                        u5_nvtm_hcm, u6_ldp_tm_hcm, u7_ldp_all, u8_nvth_hni;
+GRANT SELECT ON BVADMIN.THONGBAO TO u1_giamdoc, u2_ldtm_hcm, u3_ldtk_hni, u4_nvtk_hcm,
+                                    u5_nvtm_hcm, u6_ldp_tm_hcm, u7_ldp_all, u8_nvth_hni;
 
--- u7: Lãnh đạo phòng - đọc toàn bộ thông báo cấp lãnh đạo
-CREATE USER u7_ldp_all IDENTIFIED BY "U7@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
-GRANT CREATE SESSION TO u7_ldp_all;
-GRANT SELECT ON BVADMIN.THONGBAO TO u7_ldp_all;
+-- 7b. Gán nhãn đọc (max_read_label) cho từng user — chạy bằng LBACSYS (chủ policy OLS)
+--   Ngữ nghĩa nhãn: LEVEL=cấp bậc (NV<LDK<BGD); COMPARTMENT=cơ sở (AND); GROUP=khoa (OR)
+--   u1: Giám đốc đọc toàn bộ        u2: LĐ Tim mạch @HCM     u3: LĐ Thần kinh @HN
+--   u4: NV Thần kinh @HCM           u5: NV Tim mạch @HCM     u6: LĐ phòng Tim mạch @HCM
+--   u7: LĐ phòng mọi cơ sở/khoa     u8: NV Tiêu hóa @HN
+CONNECT LBACSYS/lbacsys;
 
-SA_USER_ADMIN.SET_USER_LABELS(
-    policy_name    => 'BV_LABEL_POLICY',
-    user_name      => 'U7_LDP_ALL',
-    max_read_label => 'LDK:HCM,HPN,HNI:TH,TK,TM'  -- LDK level, mọi cơ sở và khoa
-);
-
--- u8: Nhân viên Khoa tiêu hóa tại Hà Nội
-CREATE USER u8_nvth_hni IDENTIFIED BY "U8@2025" DEFAULT TABLESPACE USERS QUOTA 0 ON USERS;
-GRANT CREATE SESSION TO u8_nvth_hni;
-GRANT SELECT ON BVADMIN.THONGBAO TO u8_nvth_hni;
-
-SA_USER_ADMIN.SET_USER_LABELS(
-    policy_name    => 'BV_LABEL_POLICY',
-    user_name      => 'U8_NVTH_HNI',
-    max_read_label => 'NV:HNI:TH'
-);
+BEGIN
+  SA_USER_ADMIN.SET_USER_LABELS('BV_LABEL_POLICY','U1_GIAMDOC',    'BGD:HCM,HPN,HNI:TH,TK,TM');
+  SA_USER_ADMIN.SET_USER_LABELS('BV_LABEL_POLICY','U2_LDTM_HCM',   'LDK:HCM:TM');
+  SA_USER_ADMIN.SET_USER_LABELS('BV_LABEL_POLICY','U3_LDTK_HNI',   'LDK:HNI:TK');
+  SA_USER_ADMIN.SET_USER_LABELS('BV_LABEL_POLICY','U4_NVTK_HCM',   'NV:HCM:TK');
+  SA_USER_ADMIN.SET_USER_LABELS('BV_LABEL_POLICY','U5_NVTM_HCM',   'NV:HCM:TM');
+  SA_USER_ADMIN.SET_USER_LABELS('BV_LABEL_POLICY','U6_LDP_TM_HCM', 'LDK:HCM:TM');
+  SA_USER_ADMIN.SET_USER_LABELS('BV_LABEL_POLICY','U7_LDP_ALL',    'LDK:HCM,HPN,HNI:TH,TK,TM');
+  SA_USER_ADMIN.SET_USER_LABELS('BV_LABEL_POLICY','U8_NVTH_HNI',   'NV:HNI:TH');
+END;
+/
 
 -- ============================================================
 -- BƯỚC 8: Insert dữ liệu thông báo t1–t7 với nhãn OLS
--- Phải chạy với tài khoản có quyền WRITEUP hoặc BVADMIN được exempt
 -- ============================================================
+-- 8a. Cấp quyền FULL cho BVADMIN để gán nhãn dòng bất kỳ — PHẢI do LBACSYS thực hiện
+CONNECT LBACSYS/lbacsys;
+BEGIN
+  SA_USER_ADMIN.SET_USER_PRIVS('BV_LABEL_POLICY', 'BVADMIN', 'FULL');
+END;
+/
+
+-- 8b. Chèn thông báo kèm nhãn OLS (SET_ROW_LABEL + INSERT trong CÙNG block)
 CONNECT BVADMIN/"BVAdmin@2025";
 
--- Cấp quyền FULL để BVADMIN có thể gán nhãn bất kỳ
-SA_USER_ADMIN.SET_USER_PRIVS(
-    policy_name => 'BV_LABEL_POLICY',
-    user_name   => 'BVADMIN',
-    privileges  => 'FULL'
-);
-
--- Chèn thông báo kèm nhãn OLS bằng cách SET SESSION LABEL
--- t1: NV (tag=1001)
-SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'NV');
-INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
-VALUES('TB001', N'Thông báo họp toàn viện ngày 05/05/2025', SYSTIMESTAMP, N'Hội trường lớn');
-
--- t2: BGD (tag=1002)
-SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'BGD');
-INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
-VALUES('TB002', N'Họp khẩn Ban Giám đốc - Kế hoạch mở rộng 2025', SYSTIMESTAMP, N'Phòng họp BGD');
-
--- t3: LDK (tag=1003)
-SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'LDK');
-INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
-VALUES('TB003', N'Họp lãnh đạo khoa - Báo cáo quý 2', SYSTIMESTAMP, N'Phòng họp A');
-
--- t4: LDK::TH (tag=1004)
-SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'LDK::TH');
-INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
-VALUES('TB004', N'Họp lãnh đạo Khoa Tiêu hóa - Cải tiến quy trình', SYSTIMESTAMP, N'Phòng D2.01');
-
--- t5: NV:HCM:TH (tag=1005)
-SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'NV:HCM:TH');
-INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
-VALUES('TB005', N'Tập huấn nội soi tiêu hóa - Cơ sở HCM', SYSTIMESTAMP, N'Phòng kỹ năng HCM');
-
--- t6: NV:HNI:TH (tag=1006)
-SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'NV:HNI:TH');
-INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
-VALUES('TB006', N'Tập huấn nội soi tiêu hóa - Cơ sở Hà Nội', SYSTIMESTAMP, N'Phòng kỹ năng HN');
-
--- t7: LDK:HPN:TH,TK (tag=1007)
-SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'LDK:HPN:TH,TK');
-INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
-VALUES('TB007', N'Họp khẩn Lãnh đạo Khoa TH và TK - Cơ sở Hải Phòng', SYSTIMESTAMP, N'Phòng họp HP');
+BEGIN  -- t1: gửi toàn bộ nhân viên (NV)
+  SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'NV');
+  INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
+  VALUES('TB001', N'Thông báo họp toàn viện ngày 05/05/2025', SYSTIMESTAMP, N'Hội trường lớn');
+END;
+/
+BEGIN  -- t2: Ban giám đốc (BGD)
+  SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'BGD');
+  INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
+  VALUES('TB002', N'Họp khẩn Ban Giám đốc - Kế hoạch mở rộng 2025', SYSTIMESTAMP, N'Phòng họp BGD');
+END;
+/
+BEGIN  -- t3: các lãnh đạo khoa (LDK)
+  SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'LDK');
+  INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
+  VALUES('TB003', N'Họp lãnh đạo khoa - Báo cáo quý 2', SYSTIMESTAMP, N'Phòng họp A');
+END;
+/
+BEGIN  -- t4: lãnh đạo Khoa Tiêu hóa (LDK::TH)
+  SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'LDK::TH');
+  INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
+  VALUES('TB004', N'Họp lãnh đạo Khoa Tiêu hóa - Cải tiến quy trình', SYSTIMESTAMP, N'Phòng D2.01');
+END;
+/
+BEGIN  -- t5: NV Khoa Tiêu hóa @HCM (NV:HCM:TH)
+  SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'NV:HCM:TH');
+  INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
+  VALUES('TB005', N'Tập huấn nội soi tiêu hóa - Cơ sở HCM', SYSTIMESTAMP, N'Phòng kỹ năng HCM');
+END;
+/
+BEGIN  -- t6: NV Khoa Tiêu hóa @Hà Nội (NV:HNI:TH)
+  SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'NV:HNI:TH');
+  INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
+  VALUES('TB006', N'Tập huấn nội soi tiêu hóa - Cơ sở Hà Nội', SYSTIMESTAMP, N'Phòng kỹ năng HN');
+END;
+/
+BEGIN  -- t7: LĐ Khoa TH và TK @Hải Phòng (LDK:HPN:TH,TK)
+  SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'LDK:HPN:TH,TK');
+  INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
+  VALUES('TB007', N'Họp khẩn Lãnh đạo Khoa TH và TK - Cơ sở Hải Phòng', SYSTIMESTAMP, N'Phòng họp HP');
+END;
+/
 
 COMMIT;
 
 -- Khôi phục session label về mặc định
-SA_SESSION.RESTORE_DEFAULT_LABELS('BV_LABEL_POLICY');
+BEGIN
+  SA_SESSION.RESTORE_DEFAULT_LABELS('BV_LABEL_POLICY');
+END;
+/
 
 -- ============================================================
 -- BƯỚC 9: Kiểm thử - mỗi user thấy thông báo nào?

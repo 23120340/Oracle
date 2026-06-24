@@ -7,12 +7,16 @@ CONNECT BVADMIN/"BVAdmin@2025";
 
 ALTER TABLE HSBA_DV ENABLE ROW MOVEMENT;
 
+-- Tạo CHECKPOINT_LOG nếu chưa có. Dùng ALL_TABLES theo CURRENT_SCHEMA (đúng cả khi chạy bằng
+-- BVADMIN trực tiếp lẫn khi setup.ps1 chạy bằng SYS + ALTER SESSION SET CURRENT_SCHEMA=BVADMIN),
+-- và bắt ORA-00955 phòng trường hợp bảng đã được file 07 tạo.
 DECLARE
     v_count NUMBER;
 BEGIN
     SELECT COUNT(*) INTO v_count
-    FROM USER_TABLES
-    WHERE TABLE_NAME = 'CHECKPOINT_LOG';
+    FROM   ALL_TABLES
+    WHERE  TABLE_NAME = 'CHECKPOINT_LOG'
+      AND  OWNER = SYS_CONTEXT('USERENV','CURRENT_SCHEMA');
 
     IF v_count = 0 THEN
         EXECUTE IMMEDIATE q'[
@@ -23,6 +27,9 @@ BEGIN
             )
         ]';
     END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -955 THEN RAISE; END IF;  -- -955 = name already used → bỏ qua
 END;
 /
 

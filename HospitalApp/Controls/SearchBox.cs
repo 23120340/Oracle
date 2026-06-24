@@ -1,4 +1,4 @@
-using HospitalApp.Theme;
+﻿using HospitalApp.Theme;
 
 namespace HospitalApp.Controls;
 
@@ -18,9 +18,9 @@ public sealed class SearchBox : UserControl
 
     public SearchBox()
     {
-        Width = 300; Height = 32;
+        Width = 300; Height = 38;   // FIX: cao hơn để chữ (dấu tiếng Việt) không bị cắt đáy
         BackColor = Color.White;
-        Padding = new Padding(8, 4, 8, 4);
+        Padding = new Padding(8, 2, 8, 2);
         BorderStyle = BorderStyle.FixedSingle;
 
         _icon = new Label

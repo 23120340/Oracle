@@ -16,7 +16,7 @@
 -- ============================================================
 -- PHẦN 1: KÍCH HOẠT KIỂM TOÁN HỆ THỐNG
 -- ============================================================
-CONNECT SYS/password AS SYSDBA;
+CONNECT SYS/&&sys_pwd AS SYSDBA;
 
 -- Đảm bảo audit đang bật (Oracle 11g: audit_trail = DB | DB,EXTENDED)
 -- Kiểm tra tham số hiện tại
@@ -29,6 +29,39 @@ SELECT VALUE FROM V$PARAMETER WHERE NAME = 'audit_trail';
 
 -- Kích hoạt kiểm toán phiên đăng nhập (tất cả user)
 AUDIT SESSION;
+
+-- ============================================================
+-- PHẦN 1B (QUAN TRỌNG): kiểm tra chế độ Unified Auditing — Oracle 12c+/21c XE
+-- ============================================================
+-- Nếu DB ở chế độ PURE UNIFIED AUDITING:
+--   • Lệnh AUDIT kiểu cũ + DBMS_FGA vẫn chạy nhưng GHI VÀO UNIFIED_AUDIT_TRAIL,
+--   • DBA_AUDIT_TRAIL / DBA_FGA_AUDIT_TRAIL sẽ RỖNG (PHẦN 5 đọc ra 0 dòng).
+-- Kiểm tra chế độ hiện tại:
+SELECT VALUE AS UNIFIED_AUDITING FROM V$OPTION WHERE PARAMETER = 'Unified Auditing';
+-- Nếu kết quả = TRUE → dùng Unified Audit Policy (mẫu tương đương 5 ngữ cảnh dưới đây)
+-- và ĐỌC nhật ký từ UNIFIED_AUDIT_TRAIL thay vì DBA_AUDIT_TRAIL/DBA_FGA_AUDIT_TRAIL.
+/*
+  CREATE AUDIT POLICY pol_dpv_benhnhan ACTIONS SELECT, INSERT, UPDATE ON BVADMIN.BENHNHAN;
+  AUDIT POLICY pol_dpv_benhnhan BY DPV_NV001;
+
+  CREATE AUDIT POLICY pol_bs_hsba     ACTIONS UPDATE ON BVADMIN.HSBA;
+  AUDIT POLICY pol_bs_hsba BY BS_NV003;
+
+  CREATE AUDIT POLICY pol_ktv_hsbadv  ACTIONS SELECT, UPDATE ON BVADMIN.HSBA_DV;
+  AUDIT POLICY pol_ktv_hsbadv BY KTV_NV006 WHENEVER NOT SUCCESSFUL;
+
+  CREATE AUDIT POLICY pol_bn_benhnhan ACTIONS UPDATE ON BVADMIN.BENHNHAN;
+  AUDIT POLICY pol_bn_benhnhan BY BN_BN001 WHENEVER NOT SUCCESSFUL;
+
+  CREATE AUDIT POLICY pol_logon_fail  ACTIONS LOGON;
+  AUDIT POLICY pol_logon_fail WHENEVER NOT SUCCESSFUL;
+
+  -- Đọc nhật ký (cả audit chuẩn lẫn FGA gộp chung 1 view):
+  SELECT DBUSERNAME, ACTION_NAME, OBJECT_SCHEMA, OBJECT_NAME, RETURN_CODE, EVENT_TIMESTAMP, SQL_TEXT
+  FROM   UNIFIED_AUDIT_TRAIL
+  WHERE  OBJECT_SCHEMA = 'BVADMIN'
+  ORDER  BY EVENT_TIMESTAMP DESC FETCH FIRST 50 ROWS ONLY;
+*/
 
 -- ============================================================
 -- PHẦN 2: STANDARD AUDIT - 5 ngữ cảnh kiểm toán
@@ -85,6 +118,48 @@ GRANT EXECUTE ON DBMS_FGA TO BVADMIN;
 
 CONNECT BVADMIN/"BVAdmin@2025";
 
+-- FIX (ORA-28138 = "error in evaluating the fine grained audit policy predicate"):
+-- audit_condition của FGA phải là MỘT predicate đơn giản (1 toán tử), KHÔNG được chứa
+-- AND / OR / IN. Bọc logic nhiều toán tử vào hàm trả về 'Y'/'N' rồi so sánh đơn.
+-- fn_is_illegal_hsba: 'Y' khi user KHÔNG phải BS (gồm cả VAITRO IS NULL)
+CREATE OR REPLACE FUNCTION fn_is_illegal_hsba RETURN VARCHAR2 AS
+    v_vaitro NHANVIEN.VAITRO%TYPE := fn_get_vaitro();
+BEGIN
+    IF v_vaitro IS NULL OR v_vaitro != 'BS' THEN
+        RETURN 'Y';
+    ELSE
+        RETURN 'N';
+    END IF;
+END fn_is_illegal_hsba;
+/
+
+-- fn_is_illegal_hsba_dv: 'Y' khi user KHÔNG phải BS lẫn DPV (gồm cả VAITRO IS NULL)
+CREATE OR REPLACE FUNCTION fn_is_illegal_hsba_dv RETURN VARCHAR2 AS
+    v_vaitro NHANVIEN.VAITRO%TYPE := fn_get_vaitro();
+BEGIN
+    IF v_vaitro IS NULL OR (v_vaitro != 'BS' AND v_vaitro != 'DPV') THEN
+        RETURN 'Y';
+    ELSE
+        RETURN 'N';
+    END IF;
+END fn_is_illegal_hsba_dv;
+/
+
+-- Idempotent: gỡ FGA policy cũ nếu đã tồn tại (tránh ORA-28101 khi chạy lại mà không -Reset)
+DECLARE
+    PROCEDURE drop_fga(p_obj VARCHAR2, p_pol VARCHAR2) IS
+    BEGIN
+        DBMS_FGA.DROP_POLICY('BVADMIN', p_obj, p_pol);
+    EXCEPTION WHEN OTHERS THEN NULL;   -- policy chưa tồn tại
+    END;
+BEGIN
+    drop_fga('DONTHUOC', 'FGA_DONTHUOC_UPDATE');
+    drop_fga('HSBA',     'FGA_HSBA_BS_UPDATE');
+    drop_fga('HSBA',     'FGA_HSBA_ILLEGAL_UPDATE');
+    drop_fga('HSBA_DV',  'FGA_HSBA_DV_ILLEGAL');
+END;
+/
+
 -- --- FGA 3a ---
 -- Ghi vết UPDATE TENTHUOC hoặc LIEUDUNG trong DONTHUOC
 -- (sau khi đơn thuốc đã tạo, bác sĩ điều chỉnh tên thuốc hoặc liều dùng)
@@ -94,7 +169,7 @@ BEGIN
         object_name     => 'DONTHUOC',
         policy_name     => 'FGA_DONTHUOC_UPDATE',
         audit_condition => NULL,          -- luôn audit khi có access
-        audit_column    => 'TENTHUOC,LIEUDUNG',  -- chỉ khi truy cập 2 cột này
+        audit_column    => 'MAHSBA,NGAYDT,TENTHUOC,LIEUDUNG',  -- đủ 4 cột theo YC3-3a
         handler_schema  => NULL,
         handler_module  => NULL,
         enable          => TRUE,
@@ -130,9 +205,10 @@ END;
 -- "Bất hợp pháp" = user KHÔNG phải BS nhưng cố UPDATE
 -- Sử dụng Standard Audit WHENEVER NOT SUCCESSFUL để bắt lỗi quyền
 CONNECT SYSTEM/oracle;
-AUDIT UPDATE(CHANDOAN) ON BVADMIN.HSBA BY ACCESS WHENEVER NOT SUCCESSFUL;
-AUDIT UPDATE(DIEUTRI)  ON BVADMIN.HSBA BY ACCESS WHENEVER NOT SUCCESSFUL;
-AUDIT UPDATE(KETLUAN)  ON BVADMIN.HSBA BY ACCESS WHENEVER NOT SUCCESSFUL;
+-- FIX (B5/H4): AUDIT chuẩn KHÔNG hỗ trợ mức cột "AUDIT UPDATE(CHANDOAN)..." (lỗi cú pháp).
+-- Dùng audit mức BẢNG cho UPDATE thất bại → bắt được hành vi cập nhật bất hợp pháp
+-- khi user không phải BS bị từ chối quyền cột (ORA-01031) trên CHANDOAN/DIEUTRI/KETLUAN.
+AUDIT UPDATE ON BVADMIN.HSBA BY ACCESS WHENEVER NOT SUCCESSFUL;
 
 -- Kết hợp FGA: audit khi user KHÔNG phải BS mà vẫn UPDATE thành công
 -- (trường hợp bỏ qua VPD - cần ghi vết)
@@ -142,7 +218,7 @@ BEGIN
         object_schema   => 'BVADMIN',
         object_name     => 'HSBA',
         policy_name     => 'FGA_HSBA_ILLEGAL_UPDATE',
-        audit_condition => 'BVADMIN.fn_get_vaitro() != ''BS'' OR BVADMIN.fn_get_vaitro() IS NULL',
+        audit_condition => 'BVADMIN.fn_is_illegal_hsba() = ''Y''',   -- FIX ORA-28138: predicate đơn
         audit_column    => 'CHANDOAN,DIEUTRI,KETLUAN',
         enable          => TRUE,
         statement_types => 'UPDATE',
@@ -160,7 +236,7 @@ BEGIN
         object_schema   => 'BVADMIN',
         object_name     => 'HSBA_DV',
         policy_name     => 'FGA_HSBA_DV_ILLEGAL',
-        audit_condition => 'BVADMIN.fn_get_vaitro() NOT IN (''BS'',''DPV'') OR BVADMIN.fn_get_vaitro() IS NULL',
+        audit_condition => 'BVADMIN.fn_is_illegal_hsba_dv() = ''Y''',   -- FIX ORA-28138: predicate đơn
         audit_column    => NULL,  -- audit mọi cột
         enable          => TRUE,
         statement_types => 'INSERT,UPDATE,DELETE',
@@ -172,6 +248,9 @@ END;
 -- ============================================================
 -- PHẦN 4: TẠO TÌNH HUỐNG KIỂM CHỨNG
 -- ============================================================
+-- Tình huống C/D CỐ Ý gây lỗi (ORA-01031) để sinh bản ghi audit thất bại.
+-- Đặt CONTINUE để không làm dừng migration khi chạy tự động.
+WHENEVER SQLERROR CONTINUE
 
 -- Tình huống A: BS_NV003 cập nhật CHANDOAN (hợp lệ - trigger + FGA ghi vết)
 CONNECT BS_NV003/"BV@2025!";
