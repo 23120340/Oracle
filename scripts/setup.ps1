@@ -109,6 +109,15 @@ BEGIN
     END LOOP;
 END;
 /
+-- Drop OLS policy (kem components/labels/user-labels + cot OLS_LABEL) de chay lai file 05
+-- khong bao "already exists" (ORA-12447/12453/00001). Bo qua neu chua co policy.
+BEGIN
+    SA_SYSDBA.DROP_POLICY('BV_LABEL_POLICY', TRUE);
+    DBMS_OUTPUT.PUT_LINE('Dropped OLS policy BV_LABEL_POLICY');
+EXCEPTION WHEN OTHERS THEN
+    DBMS_OUTPUT.PUT_LINE('OLS policy drop skipped: ' || SQLERRM);
+END;
+/
 EXIT
 "@
     $tempPath = Join-Path ([System.IO.Path]::GetTempPath()) "oracle_setup_reset.sql"

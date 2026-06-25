@@ -166,10 +166,12 @@ BEGIN
         schema_name   => 'BVADMIN',
         table_name    => 'THONGBAO',
         -- Chỉ READ_CONTROL (kiểm soát ĐỌC theo nhãn).
-        -- KHÔNG dùng LABEL_DEFAULT: BVADMIN có quyền FULL (BƯỚC 8a) nên OLS BỎ QUA việc
-        --   tự gán nhãn khi user FULL insert ⇒ SET_ROW_LABEL/LABEL_DEFAULT đều VÔ HIỆU,
-        --   cột OLS_LABEL sẽ NULL ⇒ u1–u8 đọc 0 dòng. (Đã kiểm chứng trên Oracle 21c XE.)
-        --   Vì vậy BƯỚC 8b gán nhãn TRỰC TIẾP bằng CHAR_TO_LABEL.
+        -- KHÔNG dùng LABEL_DEFAULT vì BƯỚC 8b gán nhãn TRỰC TIẾP bằng CHAR_TO_LABEL.
+        --   Lý do: cơ chế tự-gán-nhãn (LABEL_DEFAULT + SET_ROW_LABEL) chỉ chạy nếu tài khoản
+        --   INSERT có NHÃN OLS riêng (SA_USER_ADMIN.SET_USER_LABELS: def/row + phạm vi write
+        --   phủ các nhãn cần ghi). BVADMIN chỉ được cấp FULL (BƯỚC 8a) chứ CHƯA từng
+        --   SET_USER_LABELS ⇒ không có nhãn phiên ⇒ OLS_LABEL = NULL (đã kiểm chứng 21c XE).
+        --   Gán tường minh CHAR_TO_LABEL đơn giản & chắc chắn hơn cho dữ liệu seed nhiều nhãn.
         table_options => 'READ_CONTROL',
         label_function => NULL,
         predicate      => NULL
@@ -226,9 +228,9 @@ BEGIN
 END;
 /
 
--- 8b. Chèn thông báo, gán nhãn OLS TRỰC TIẾP bằng CHAR_TO_LABEL.
---     KHÔNG dùng SA_SESSION.SET_ROW_LABEL: BVADMIN có quyền FULL nên OLS không tự gán
---     nhãn dòng (xem ghi chú BƯỚC 6) ⇒ phải ghi thẳng giá trị nhãn vào cột OLS_LABEL.
+-- 8b. Chèn thông báo, gán nhãn OLS TRỰC TIẾP bằng CHAR_TO_LABEL (mỗi dòng t1–t7 một nhãn riêng).
+--     KHÔNG dùng SA_SESSION.SET_ROW_LABEL ở đây — xem lý do ở ghi chú BƯỚC 6
+--     (BVADMIN chưa được SET_USER_LABELS nên không có nhãn phiên để tự gán).
 CONNECT BVADMIN/"BVAdmin@2025";
 
 -- t1: gửi toàn bộ nhân viên (NV)

@@ -13,10 +13,12 @@
 --   sqlplus /nolog "@d:\repos\Oracle\PhanHe2\extras\fix_benhnhan_account.sql"
 -- >>> SỬA mật khẩu SYS cho khớp DB của bạn ở dòng CONNECT bên dưới.
 -- ============================================================
-SET DEFINE OFF
+-- >>> ĐIỀN MẬT KHẨU SYS CỦA MÁY BẠN VÀO ĐÂY (chỉ sửa dòng DEFINE) <<<
+DEFINE SYS_PWD = "oracle"
+SET DEFINE ON
 
 -- 1) Cấp quyền cho BVADMIN (dùng SYS vì SYSTEM có thể đang khoá)
-CONNECT sys/"Phamminhquan611*"@localhost:1521/XEPDB1 AS SYSDBA
+CONNECT sys/"&SYS_PWD"@localhost:1521/XEPDB1 AS SYSDBA
 GRANT CREATE USER TO BVADMIN;
 GRANT CREATE SESSION TO BVADMIN WITH ADMIN OPTION;
 

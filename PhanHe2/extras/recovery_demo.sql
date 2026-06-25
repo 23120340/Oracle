@@ -7,6 +7,7 @@
 -- Sua SYS_PWD neu mat khau SYS khac.
 -- ============================================================
 
+-- >>> ĐIỀN MẬT KHẨU SYS CỦA MÁY BẠN VÀO ĐÂY (chỉ sửa dòng DEFINE SYS_PWD) <<<
 DEFINE SYS_PWD = "oracle"
 DEFINE BVA_PWD = "BVAdmin@2025"
 DEFINE DB_URL  = "//localhost:1521/XEPDB1"

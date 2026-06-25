@@ -286,7 +286,7 @@ public class AdminDashboard : Form
                 kU.Value = _db.Scalar("SELECT COUNT(*) FROM DBA_USERS")?.ToString() ?? "—";
                 kR.Value = _db.Scalar("SELECT COUNT(*) FROM DBA_ROLES")?.ToString() ?? "—";
                 kG.Value = _db.Scalar("SELECT COUNT(*) FROM DBA_TAB_PRIVS WHERE GRANTEE NOT IN ('SYS','SYSTEM','PUBLIC')")?.ToString() ?? "—";
-                kA.Value = _db.Scalar("SELECT COUNT(*) FROM DBA_AUDIT_TRAIL WHERE TRUNC(TIMESTAMP)=TRUNC(SYSDATE)")?.ToString() ?? "—";
+                kA.Value = _db.Scalar("SELECT COUNT(*) FROM UNIFIED_AUDIT_TRAIL WHERE TRUNC(EVENT_TIMESTAMP)=TRUNC(SYSDATE)")?.ToString() ?? "—";
             }
             catch { /* may not have full DBA privs, ignore */ }
             kU.Invalidate(); kR.Invalidate(); kG.Invalidate(); kA.Invalidate();
@@ -294,7 +294,7 @@ public class AdminDashboard : Form
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // TAB 6 (NEW): AUDIT LOG VIEWER — Đọc DBA_AUDIT_TRAIL + APP_LOGIN_LOG
+    // TAB 6 (NEW): AUDIT LOG VIEWER — Đọc UNIFIED_AUDIT_TRAIL (Oracle 21c) + APP_LOGIN_LOG
     // ═══════════════════════════════════════════════════════════════════════════
     private TabPage BuildAuditTab()
     {
@@ -336,12 +336,12 @@ public class AdminDashboard : Form
         btnRefresh.Click += (_, _) => TryCatch(() =>
         {
             grid.DataSource = _db.Query(
-                "SELECT TO_CHAR(TIMESTAMP, 'DD/MM HH24:MI:SS') AS TIME, " +
-                "USERNAME, OBJ_NAME AS OBJECT, ACTION_NAME AS ACTION, " +
-                "DECODE(RETURNCODE, 0, 'OK', 'FAIL') AS RESULT " +
-                "FROM DBA_AUDIT_TRAIL " +
-                "WHERE TIMESTAMP > SYSDATE - 7 " +
-                "ORDER BY TIMESTAMP DESC " +
+                "SELECT TO_CHAR(EVENT_TIMESTAMP, 'DD/MM HH24:MI:SS') AS TIME, " +
+                "DBUSERNAME AS USERNAME, OBJECT_NAME AS OBJECT, ACTION_NAME AS ACTION, " +
+                "DECODE(RETURN_CODE, 0, 'OK', 'FAIL') AS RESULT " +
+                "FROM UNIFIED_AUDIT_TRAIL " +
+                "WHERE EVENT_TIMESTAMP > SYSTIMESTAMP - INTERVAL '7' DAY " +
+                "ORDER BY EVENT_TIMESTAMP DESC " +
                 "FETCH FIRST 200 ROWS ONLY");
         });
 

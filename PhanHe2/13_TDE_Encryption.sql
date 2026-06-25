@@ -21,24 +21,27 @@
 --
 -- Cách chạy (PowerShell):  $env:NLS_LANG=".AL32UTF8"; sqlplus /nolog "@...\13_TDE_Encryption.sql"
 -- ============================================================
-SET DEFINE OFF
+-- >>> ĐIỀN MẬT KHẨU CỦA MÁY BẠN VÀO 2 DÒNG NÀY (chỉ sửa ở đây) <<<
+DEFINE SYS_PWD    = "oracle"          -- mật khẩu SYS của DB (đổi cho khớp máy bạn)
+DEFINE WALLET_PWD = "TdeWallet2025x"  -- mật khẩu keystore TDE (giữ kỹ — mất = mất dữ liệu)
+SET DEFINE ON
 WHENEVER SQLERROR CONTINUE
 
 -- ── B1. Tạo + mở keystore tại CDB ROOT (đúng vị trí instance dùng) ───────────
-CONNECT sys/"Phamminhquan611*"@localhost:1521/XE AS SYSDBA
+CONNECT sys/"&SYS_PWD"@localhost:1521/XE AS SYSDBA
 
-ADMINISTER KEY MANAGEMENT CREATE KEYSTORE 'D:\Oracle\admin\XE\wallet' IDENTIFIED BY "TdeWallet2025x";
-ADMINISTER KEY MANAGEMENT SET KEYSTORE OPEN IDENTIFIED BY "TdeWallet2025x" CONTAINER=ALL;
+ADMINISTER KEY MANAGEMENT CREATE KEYSTORE 'D:\Oracle\admin\XE\wallet' IDENTIFIED BY "&WALLET_PWD";
+ADMINISTER KEY MANAGEMENT SET KEYSTORE OPEN IDENTIFIED BY "&WALLET_PWD" CONTAINER=ALL;
 
 -- ── B2. Đặt master key: ROOT trước, rồi PDB XEPDB1 ──────────────────────────
-ADMINISTER KEY MANAGEMENT SET KEY IDENTIFIED BY "TdeWallet2025x" WITH BACKUP;
+ADMINISTER KEY MANAGEMENT SET KEY IDENTIFIED BY "&WALLET_PWD" WITH BACKUP;
 ALTER SESSION SET CONTAINER = XEPDB1;
-ADMINISTER KEY MANAGEMENT SET KEY IDENTIFIED BY "TdeWallet2025x" WITH BACKUP;
+ADMINISTER KEY MANAGEMENT SET KEY IDENTIFIED BY "&WALLET_PWD" WITH BACKUP;
 
 -- ── B3. AUTO-LOGIN keystore (DB tự mở keystore khi khởi động) ───────────────
 -- Thiếu bước này: sau restart phải mở keystore tay, nếu không cột mã hóa không đọc được.
 ALTER SESSION SET CONTAINER = CDB$ROOT;
-ADMINISTER KEY MANAGEMENT CREATE AUTO_LOGIN KEYSTORE FROM KEYSTORE 'D:\Oracle\admin\XE\wallet' IDENTIFIED BY "TdeWallet2025x";
+ADMINISTER KEY MANAGEMENT CREATE AUTO_LOGIN KEYSTORE FROM KEYSTORE 'D:\Oracle\admin\XE\wallet' IDENTIFIED BY "&WALLET_PWD";
 
 -- ── B4. Mã hóa cột nhạy cảm (trong PDB, bảng của BVADMIN) ────────────────────
 ALTER SESSION SET CONTAINER = XEPDB1;

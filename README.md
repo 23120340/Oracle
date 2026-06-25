@@ -42,7 +42,8 @@ Oracle/
 │   ├── 13_TDE_Encryption.sql    ← (Mở rộng) Mã hóa cột nhạy cảm at-rest bằng TDE (chạy thủ công)
 │   ├── setup_all.sql            ← Tổng hợp view + grant (chạy SAU CÙNG, bằng BVADMIN)
 │   ├── setup_admin_user.sql     ← Tạo HOSPITAL_DBA (tài khoản vào AdminDashboard)
-│   ├── run_migrations.ps1       ← Runner chạy 01→13 + setup_all
+│   ├── verify_all.sql           ← KIỂM TRA NHANH YC1–YC4 sau khi cài (chỉ đọc) — xem §5b
+│   ├── run_migrations.ps1       ← Runner thay thế (01→12 + setup_all); kém tin cậy hơn setup.ps1 vì phụ thuộc mật khẩu CONNECT cố định
 │   ├── REVIEW_LOI_PHANHE2.md    ← Báo cáo rà soát lỗi + trạng thái sửa (checklist)
 │   └── extras/                  ← File phụ (demo + hotfix, KHÔNG bắt buộc để chạy — chạy thủ công)
 │       ├── recovery_demo.sql        ← Demo phục hồi Flashback (chạy khi vấn đáp)
@@ -73,9 +74,15 @@ Oracle/
 | NuGet | `Oracle.ManagedDataAccess.Core 23.4.0` (tự restore) |
 | Công cụ chạy SQL | **SQL\*Plus** hoặc **SQLcl** (khuyên dùng vì hỗ trợ UTF-8 BOM sẵn) |
 
-> ⚠️ **Mật khẩu trong script là giả định** — phải khớp DB của bạn hoặc sửa lại trước khi chạy:
-> `SYS/<your_sys_pwd>`, `SYSTEM/oracle`, `LBACSYS/lbacsys`, `BVADMIN/"BVAdmin@2025"`.
-> Các file 06/07/10 dùng biến thay thế `&&sys_pwd` → SQL\*Plus sẽ **hỏi mật khẩu SYS một lần**.
+> ⚠️ **Về mật khẩu — đọc kỹ để khỏi nhầm (đây là chỗ hay gây lỗi nhất):**
+> - **Dùng `scripts/setup.ps1` (khuyên dùng):** runner nối **một lần bằng SYS** rồi tự *viết lại* mọi
+>   lệnh `CONNECT` nội bộ thành `ALTER SESSION` → **CHỈ cần đúng mật khẩu SYS** (`-SysPass`). Các chuỗi
+>   `SYSTEM/oracle`, `LBACSYS/lbacsys`, `BVADMIN/"BVAdmin@2025"` ghi trong file 01–12 **không hề được
+>   dùng tới** khi chạy bằng runner này (chỉ là placeholder) — nên chúng "lệch nhau mà vẫn chạy được".
+> - **Các file chạy TAY** (`13_TDE_Encryption`, `extras/recovery_demo`, `extras/NNE_TDE_demo`,
+>   `extras/fix_*`): mỗi file có **đúng 1 dòng** `DEFINE SYS_PWD = "..."` ở đầu, đánh dấu
+>   `>>> ĐIỀN MẬT KHẨU SYS… <<<` — sửa cho khớp máy bạn (mặc định `"oracle"`).
+> - Các file 06/07/10 dùng `&&sys_pwd` → nếu chạy bằng SQL\*Plus trực tiếp sẽ **hỏi mật khẩu SYS một lần**.
 
 ---
 
@@ -140,22 +147,25 @@ SELECT VALUE FROM V$OPTION WHERE PARAMETER = 'Oracle Label Security';  -- TRUE
 ### ✅ Cách 1 (KHUYÊN DÙNG) — một lệnh `scripts/setup.ps1`
 
 Runner này nối **một lần** vào XEPDB1 bằng SYS, tự xử lý đúng container (CDB/PDB), tự đặt
-`NLS_LANG=.AL32UTF8` và ghi file tạm **UTF-8** (tiếng Việt không hỏng dấu). Nó chạy **toàn bộ**:
-`01 → 10`, rồi `11/13/setup_all` (trong schema BVADMIN), `setup_admin_user`, và demo phục hồi.
+`NLS_LANG=.AL32UTF8` và ghi file tạm **UTF-8** (tiếng Việt không hỏng dấu). Nó chạy:
+`01 → 12` + `setup_all` (trong schema BVADMIN) + `setup_admin_user`.
+**File 13 (TDE) KHÔNG nằm trong runner** — chạy riêng/thủ công (cần keystore), xem §8 mục Mã hoá.
 
 ```powershell
 cd D:\repos\Oracle
-# Lần đầu hoặc chạy lại: thêm -Reset để DROP sạch user/role demo cũ trước (tránh ORA-01920/00955)
+# Lần đầu HOẶC chạy lại đều nên thêm -Reset: DROP sạch user/role + policy OLS cũ trước khi dựng.
 .\scripts\setup.ps1 -HostName localhost -Port 1521 -Sid XEPDB1 -SysPass "<mat_khau_SYS>" -Reset
 ```
 
-Tham số: `-AppOnly` (bỏ audit/backup), `-BvAdminPass`, `-LbacsysPass`.
-(Demo phục hồi & các fix nay nằm ở `PhanHe2/extras/` — chạy thủ công khi cần, runner không tự gọi.)
+Tham số: `-AppOnly` (bỏ audit/backup). (Chỉ cần `-SysPass`; các mật khẩu khác runner không dùng — xem §2.)
+(Demo phục hồi & các fix nằm ở `PhanHe2/extras/` — chạy thủ công khi cần, runner không tự gọi.)
 
-> ⚠️ **Phải dùng `-Reset` khi chạy lại** — nếu DB đã có `BVADMIN`/role từ lần trước, chạy lại
-> không `-Reset` sẽ báo `ORA-01920`/`ORA-00955`/`ORA-00947`.
-> Yêu cầu 2 (OLS, file 05) cần đã cài Oracle Label Security trong XEPDB1 — xem §4 (nếu chưa cài,
-> runner vẫn chạy tiếp các phần khác, chỉ OLS không thiết lập được).
+> ⚠️ **Phải dùng `-Reset` khi chạy lại** — nếu DB đã có `BVADMIN`/role/**policy OLS** từ lần trước, chạy
+> lại không `-Reset` sẽ báo `ORA-01920`/`ORA-00955`/`ORA-12447`/`ORA-12453`. `-Reset` nay xoá **cả
+> policy OLS `BV_LABEL_POLICY`** (kèm cột nhãn) nên file 05 không còn báo "already exists".
+> - Yêu cầu 2 (OLS, file 05) cần đã cài Oracle Label Security trong XEPDB1 — xem §4 (nếu chưa cài,
+>   runner vẫn chạy tiếp các phần khác, chỉ OLS không thiết lập được).
+> - ✅ **Chạy xong → kiểm tra ngay bằng `PhanHe2/verify_all.sql`** (xem mục §5b "Kiểm tra nhanh" dưới đây).
 
 ### Cách 2 — thủ công bằng SQL\*Plus (khi cần kiểm soát từng bước)
 
@@ -188,8 +198,40 @@ sqlplus 'SYS/<mat_khau_SYS>@//localhost:1521/XEPDB1 AS SYSDBA'
 EXIT
 ```
 
-> `PhanHe2/run_migrations.ps1` là một runner khác (01→13 + setup_all) nhưng **phụ thuộc mật khẩu
+> `PhanHe2/run_migrations.ps1` là một runner khác (01→12 + setup_all) nhưng **phụ thuộc mật khẩu
 > CONNECT cố định trong file** — kém tin cậy hơn `setup.ps1`; chỉ dùng nếu bạn đã sửa mật khẩu cho khớp.
+
+---
+
+## 5b. ✅ Kiểm tra nhanh sau khi cài (cho thành viên review)
+
+Chạy **một lệnh** để xác nhận YC1–YC4 đã thiết lập đúng. Script chỉ **ĐỌC** (SELECT), không sửa dữ liệu:
+
+```powershell
+$env:NLS_LANG = ".AL32UTF8"
+# (sửa dòng DEFINE SYS_PWD ở đầu verify_all.sql nếu mật khẩu SYS != "oracle")
+sqlplus /nolog "@PhanHe2/verify_all.sql"
+```
+
+Kết quả **ĐẠT** mong đợi:
+
+| Hạng mục | Kỳ vọng |
+|---|---|
+| Tài khoản demo | `SO_TK = 20` |
+| **YC1 – VPD** | đúng **4 policy**: `POL_HSBA_DPV_BS` · `POL_HSBA_DV_DPV_BS` · `POL_BENHNHAN_DPV_BS` · `POL_DONTHUOC_BS` |
+| **YC1 – VPD (đọc thật)** | `DPV_NV001` thấy **tất cả** HSBA; `BS_NV003` thấy **ít hơn** (chỉ bệnh nhân của mình) |
+| **YC2 – OLS** | THONGBAO `TONG=7, CO_NHAN=7`; `u1_giamdoc` thấy **7**; `u8_nvth_hni` thấy **đúng TB001 + TB006** |
+| **YC3 – Audit** | **6** unified policy (`POL_*`) + **4** FGA policy |
+| (Mở rộng) TDE | có cột mã hoá nếu đã chạy file 13 — không bắt buộc |
+
+**Kiểm tra trên giao diện app** (đăng nhập theo bảng §6):
+- `HOSPITAL_DBA` → AdminDashboard: các thẻ **Người dùng / Vai trò / Cấp quyền** có số; tab **Nhật ký kiểm toán** hiện bản ghi (app đọc `UNIFIED_AUDIT_TRAIL`).
+- `u1_giamdoc` → OLSViewer thấy 7 thông báo; `u8_nvth_hni` thấy 2.
+- `BS_NV003` → BSForm chỉ thấy bệnh nhân/HSBA của mình; `DPV_NV001` thấy tất cả.
+
+> ℹ️ **KHÔNG dùng `BVADMIN` để vào AdminDashboard.** `BVADMIN` là chủ schema dữ liệu (Phân hệ 2),
+> KHÔNG có role DBA → sẽ báo *"Đối tượng dữ liệu không tồn tại hoặc bạn không có quyền truy cập"*.
+> Đúng tài khoản DBA là **`HOSPITAL_DBA / Hospital@DBA2025`**.
 
 ---
 
@@ -244,7 +286,7 @@ Giao diện **AdminDashboard** cho DBA:
 | Cấp quyền | Grant quyền hệ thống / đối tượng (table/view/procedure/function) / cấp role; phân quyền tới **mức cột** cho SELECT/UPDATE; tuỳ chọn **WITH GRANT OPTION** |
 | Thu hồi quyền | Revoke quyền hệ thống / đối tượng / cột / role |
 | Xem quyền | Liệt kê system/object/column/role privilege của user hoặc role |
-| Nhật ký audit | Xem `DBA_AUDIT_TRAIL` (7 ngày gần nhất) |
+| Nhật ký audit | Xem `UNIFIED_AUDIT_TRAIL` (7 ngày gần nhất) — Oracle 21c |
 
 ---
 
@@ -378,7 +420,7 @@ Tất cả kiểm soát truy cập do **Oracle DB Engine** thực thi (RBAC + VP
 | `Enter value for ...:` (prompt đứng im) | Ký tự `&` trong comment/chuỗi bị hiểu là biến thay thế → **đã sửa** (`setup.ps1` tự `SET DEFINE OFF`; bỏ `&` trong comment). Đang kẹt: bấm **Ctrl+C** để thoát |
 | Tiếng Việt thành `???` / lỗi dấu trong DB | Chưa đặt `NLS_LANG=.AL32UTF8` trước khi chạy 01 → chạy lại sau khi set, hoặc chạy `extras/fix_utf8_data.sql` bằng BVADMIN |
 | Tiếng Việt thành `ThÃ´ng bÃ¡o` khi chạy file `.sql` bằng `sqlplus` trong **PowerShell** | Đã gõ `set NLS_LANG=...` (cú pháp CMD, vô tác dụng trong PowerShell) → sqlplus đọc UTF-8 sai. Dùng `$env:NLS_LANG = ".AL32UTF8"` rồi chạy lại trong cùng cửa sổ (xem §3) |
-| Đăng nhập u1–u8 OLS **không thấy thông báo nào** | `THONGBAO.OLS_LABEL` đang NULL (nhãn chưa gán) → chạy `PhanHe2/extras/fix_ols_thongbao.sql` bằng CONNECT thật (xem §8 – Yêu cầu 2) |
+| Đăng nhập u1–u8 OLS **không thấy thông báo nào** | `THONGBAO.OLS_LABEL` đang NULL. File 05 nay gán nhãn **trực tiếp bằng `CHAR_TO_LABEL`** (không phụ thuộc `SET_ROW_LABEL`, vì BVADMIN có quyền FULL → OLS bỏ qua tự-gán-nhãn) nên dựng mới đã ổn. DB cũ còn NULL: chạy `PhanHe2/extras/relabel_thongbao_inplace.sql` (UPDATE nhãn, giữ nội dung) — xem §8 Yêu cầu 2 |
 | DPV tạo bệnh nhân mới **nhưng tài khoản đăng nhập không tạo được** (báo `ORA-01031`) | BVADMIN thiếu quyền cấp `CREATE SESSION` cho tài khoản BN mới → chạy `PhanHe2/extras/fix_benhnhan_account.sql` (cấp `CREATE SESSION ... WITH ADMIN OPTION` + viết lại `sp_create_benhnhan_full` an toàn, MABN tự sinh) |
 | `ORA-65066: must apply to all containers` khi `ALTER USER LBACSYS` | LBACSYS là common user → đổi từ **CDB root** (`@.../XE`) + `CONTAINER=ALL` (xem §4) |
 | `ORA-12660` khi app kết nối sau khi bật NNE | Server đặt `ENCRYPTION_SERVER=REQUIRED` nhưng client không thỏa → tạm hạ `REQUESTED` (xem SETUP_ENCRYPTION.md §1.3) |
@@ -393,7 +435,9 @@ Tất cả kiểm soát truy cập do **Oracle DB Engine** thực thi (RBAC + VP
 | Đăng nhập app báo "Tài khoản tạm khoá Ns" | App tự khoá 60 giây sau **5 lần sai** liên tiếp → đợi hết khoá rồi nhập đúng mật khẩu |
 | DPV/BS không thấy danh sách bác sĩ/KTV | Chưa chạy `11_NV_Lookup_Grants.sql` (Pha B) |
 | Đăng nhập DBA không vào được AdminDashboard | Chưa chạy `setup_admin_user.sql` (Pha C) hoặc dùng `HOSPITAL_DBA/Hospital@DBA2025` |
-| Audit trả 0 dòng | DB ở chế độ Unified Auditing → đọc `UNIFIED_AUDIT_TRAIL` (file 06 PHẦN 1B) |
+| Audit trả 0 dòng / tab "Nhật ký kiểm toán" trong app **rỗng** | 21c ghi audit vào `UNIFIED_AUDIT_TRAIL`. File 06 nay tạo **Unified Audit Policy** (5 ngữ cảnh) + đọc đúng `UNIFIED_AUDIT_TRAIL`; app `AdminDashboard.cs` cũng đã đổi sang đọc `UNIFIED_AUDIT_TRAIL` → **rebuild app** (`dotnet build`) |
+| **VPD không lọc** — Bác sĩ thấy được bệnh nhân của người khác | `DBMS_RLS.ADD_POLICY` lỗi `ORA-28104` vì `statement_types` chứa `INSERT` (Oracle 21c từ chối INSERT cho policy này) → **đã sửa** file 04 (còn `SELECT,UPDATE,DELETE`). Kiểm bằng `verify_all.sql`: phải đủ **4** VPD policy, và `BS_NV003` thấy ít HSBA hơn `DPV_NV001` |
+| File 06 báo `ORA-01708 ACCESS or SESSION expected` | `AUDIT ... ON <obj> BY <user>` (object-audit kiểu cũ) không hợp lệ trên 21c → **đã sửa**: chuyển sang Unified Audit Policy (`CREATE AUDIT POLICY ... ; AUDIT POLICY ... BY <user>`) |
 
 ---
 

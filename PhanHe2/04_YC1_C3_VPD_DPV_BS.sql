@@ -197,7 +197,7 @@ BEGIN
     policy_name     => 'POL_HSBA_DPV_BS',
     function_schema => 'BVADMIN',
     policy_function => 'vpd_hsba',
-    statement_types => 'SELECT,INSERT,UPDATE,DELETE',
+    statement_types => 'SELECT,UPDATE,DELETE',   -- BỎ 'INSERT': Oracle 21c báo ORA-28104 cho INSERT (đã kiểm chứng); update_check=FALSE nên INSERT vốn không lọc → VPD đọc/sửa/xóa vẫn đủ theo đề
     update_check    => FALSE,   -- FALSE: tránh kiểm dòng-mới gây ORA-28138/28115 khi BS INSERT HSBA_DV
                                  -- hoặc KTV cập nhật KETQUA qua INSTEAD OF trigger. Lọc dòng (SELECT) vẫn đủ theo đề.
     enable          => TRUE
@@ -213,7 +213,7 @@ BEGIN
     policy_name     => 'POL_HSBA_DV_DPV_BS',
     function_schema => 'BVADMIN',
     policy_function => 'vpd_hsba_dv',
-    statement_types => 'SELECT,INSERT,UPDATE,DELETE',
+    statement_types => 'SELECT,UPDATE,DELETE',   -- BỎ 'INSERT': Oracle 21c báo ORA-28104 cho INSERT (đã kiểm chứng); update_check=FALSE nên INSERT vốn không lọc → VPD đọc/sửa/xóa vẫn đủ theo đề
     update_check    => FALSE,   -- FALSE: tránh kiểm dòng-mới gây ORA-28138/28115 khi BS INSERT HSBA_DV
                                  -- hoặc KTV cập nhật KETQUA qua INSTEAD OF trigger. Lọc dòng (SELECT) vẫn đủ theo đề.
     enable          => TRUE
@@ -245,7 +245,7 @@ BEGIN
     policy_name     => 'POL_DONTHUOC_BS',
     function_schema => 'BVADMIN',
     policy_function => 'vpd_donthuoc',
-    statement_types => 'SELECT,INSERT,UPDATE,DELETE',
+    statement_types => 'SELECT,UPDATE,DELETE',   -- BỎ 'INSERT': Oracle 21c báo ORA-28104 cho INSERT (đã kiểm chứng); update_check=FALSE nên INSERT vốn không lọc → VPD đọc/sửa/xóa vẫn đủ theo đề
     update_check    => FALSE,   -- FALSE: tránh kiểm dòng-mới gây ORA-28138/28115 khi BS INSERT HSBA_DV
                                  -- hoặc KTV cập nhật KETQUA qua INSTEAD OF trigger. Lọc dòng (SELECT) vẫn đủ theo đề.
     enable          => TRUE

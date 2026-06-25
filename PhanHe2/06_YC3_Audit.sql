@@ -64,51 +64,62 @@ SELECT VALUE AS UNIFIED_AUDITING FROM V$OPTION WHERE PARAMETER = 'Unified Auditi
 */
 
 -- ============================================================
--- PHẦN 2: STANDARD AUDIT - 5 ngữ cảnh kiểm toán
+-- PHẦN 2: AUDIT 5 NGỮ CẢNH - dùng UNIFIED AUDIT POLICY (chuẩn Oracle 12c+/21c)
 -- ============================================================
-CONNECT SYSTEM/oracle;
+-- LƯU Ý: 'AUDIT ... ON <obj> BY <user>' (object-audit kiểu cũ) KHÔNG hợp lệ trên 21c
+-- (→ ORA-01708) và áp cho MỌI user. Để theo dõi USER CỤ THỂ trên OBJECT CỤ THỂ phải dùng
+-- Unified Audit Policy — chạy được cả khi UNIFIED_AUDITING=FALSE, ghi vào UNIFIED_AUDIT_TRAIL.
+CONNECT SYS/&&sys_pwd AS SYSDBA;
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- Spec yêu cầu: Standard Audit "theo dõi hành vi của những USER CỤ THỂ
 -- trên những đối tượng cụ thể". Vì vậy dùng AUDIT BY <username>.
 -- ════════════════════════════════════════════════════════════════════════════
 
--- --- Ngữ cảnh 1 ---
--- DPV_NV001 truy cập BENHNHAN (đúng vai trò) - log cả thành công lẫn thất bại
--- để giám sát hoạt động hàng ngày + phát hiện thử nghiệm vượt quyền
-AUDIT SELECT, INSERT, UPDATE ON BVADMIN.BENHNHAN
-    BY DPV_NV001 BY ACCESS;
+-- Idempotent: gỡ enable + drop policy cũ (an toàn khi chạy lại không -Reset)
+DECLARE
+  TYPE tlist IS TABLE OF VARCHAR2(30);
+  v tlist := tlist('POL_DPV_BENHNHAN','POL_BS_HSBA','POL_KTV_HSBADV',
+                   'POL_BN_BENHNHAN','POL_LOGON_FAIL','POL_ILLEGAL_HSBA');
+BEGIN
+  FOR i IN 1 .. v.COUNT LOOP
+    BEGIN EXECUTE IMMEDIATE 'NOAUDIT POLICY '||v(i); EXCEPTION WHEN OTHERS THEN NULL; END;
+    BEGIN EXECUTE IMMEDIATE 'DROP AUDIT POLICY '||v(i); EXCEPTION WHEN OTHERS THEN NULL; END;
+  END LOOP;
+END;
+/
 
--- --- Ngữ cảnh 2 ---
--- BS_NV003 cập nhật HSBA - theo dõi tất cả thay đổi chẩn đoán/điều trị
--- (kết hợp với FGA bên dưới để có audit chi tiết)
-AUDIT UPDATE ON BVADMIN.HSBA
-    BY BS_NV003 BY ACCESS WHENEVER SUCCESSFUL;
-AUDIT UPDATE ON BVADMIN.HSBA
-    BY BS_NV003 BY ACCESS WHENEVER NOT SUCCESSFUL;
+-- Ngữ cảnh 1: DPV_NV001 trên BENHNHAN (cả thành công lẫn thất bại)
+CREATE AUDIT POLICY pol_dpv_benhnhan ACTIONS SELECT, INSERT, UPDATE ON BVADMIN.BENHNHAN;
+AUDIT POLICY pol_dpv_benhnhan BY DPV_NV001;
 
--- --- Ngữ cảnh 3 ---
--- KTV_NV006 cập nhật KETQUA trên HSBA_DV
--- Đặc biệt theo dõi thao tác KHÔNG thành công (cố vượt quyền)
-AUDIT SELECT, UPDATE ON BVADMIN.HSBA_DV
-    BY KTV_NV006 BY ACCESS WHENEVER NOT SUCCESSFUL;
+-- Ngữ cảnh 2: BS_NV003 cập nhật HSBA (theo dõi thay đổi chẩn đoán/điều trị)
+CREATE AUDIT POLICY pol_bs_hsba ACTIONS UPDATE ON BVADMIN.HSBA;
+AUDIT POLICY pol_bs_hsba BY BS_NV003;
 
--- --- Ngữ cảnh 4 ---
--- BN_BN001 - bệnh nhân tự cập nhật thông tin
--- Theo dõi để phát hiện hành vi bất thường (vd. cố sửa CCCD/TENBN)
-AUDIT UPDATE ON BVADMIN.BENHNHAN
-    BY BN_BN001 BY ACCESS WHENEVER NOT SUCCESSFUL;
+-- Ngữ cảnh 3: KTV_NV006 trên HSBA_DV - chỉ thao tác THẤT BẠI (cố vượt quyền)
+CREATE AUDIT POLICY pol_ktv_hsbadv ACTIONS SELECT, UPDATE ON BVADMIN.HSBA_DV;
+AUDIT POLICY pol_ktv_hsbadv BY KTV_NV006 WHENEVER NOT SUCCESSFUL;
 
--- --- Ngữ cảnh 5 ---
--- Mọi kết nối không thành công (phát hiện brute-force toàn hệ thống)
-AUDIT CREATE SESSION WHENEVER NOT SUCCESSFUL;
+-- Ngữ cảnh 4: BN_BN001 cập nhật BENHNHAN - chỉ THẤT BẠI (cố sửa CCCD/TENBN…)
+CREATE AUDIT POLICY pol_bn_benhnhan ACTIONS UPDATE ON BVADMIN.BENHNHAN;
+AUDIT POLICY pol_bn_benhnhan BY BN_BN001 WHENEVER NOT SUCCESSFUL;
 
--- Kiểm tra audit đã cấu hình
-SELECT OBJECT_NAME, OBJECT_TYPE, ALT, AUD, COM, DEL, GRA, IND, INS, LOC,
-       REN, SEL, UPD, FBK, REF
-FROM   DBA_OBJ_AUDIT_OPTS
-WHERE  OWNER = 'BVADMIN'
-ORDER  BY OBJECT_NAME;
+-- Ngữ cảnh 5: MỌI đăng nhập thất bại (phát hiện brute-force toàn hệ thống)
+CREATE AUDIT POLICY pol_logon_fail ACTIONS LOGON;
+AUDIT POLICY pol_logon_fail WHENEVER NOT SUCCESSFUL;
+
+-- (bổ sung) Mọi UPDATE HSBA THẤT BẠI của bất kỳ user (bắt tình huống C: DPV cố sửa CHANDOAN)
+CREATE AUDIT POLICY pol_illegal_hsba ACTIONS UPDATE ON BVADMIN.HSBA;
+AUDIT POLICY pol_illegal_hsba WHENEVER NOT SUCCESSFUL;
+
+-- Kiểm tra các policy đã bật
+COL policy_name FORMAT A22
+COL entity_name FORMAT A14
+SELECT policy_name, enabled_option, entity_name
+FROM   audit_unified_enabled_policies
+WHERE  policy_name LIKE 'POL\_%' ESCAPE '\'
+ORDER  BY policy_name;
 
 -- ============================================================
 -- PHẦN 3: FINE-GRAINED AUDIT (FGA) - 4 tình huống đặc biệt
@@ -204,14 +215,9 @@ END;
 -- Ghi vết UPDATE bất hợp pháp trên CHANDOAN/DIEUTRI/KETLUAN
 -- "Bất hợp pháp" = user KHÔNG phải BS nhưng cố UPDATE
 -- Sử dụng Standard Audit WHENEVER NOT SUCCESSFUL để bắt lỗi quyền
-CONNECT SYSTEM/oracle;
--- FIX (B5/H4): AUDIT chuẩn KHÔNG hỗ trợ mức cột "AUDIT UPDATE(CHANDOAN)..." (lỗi cú pháp).
--- Dùng audit mức BẢNG cho UPDATE thất bại → bắt được hành vi cập nhật bất hợp pháp
--- khi user không phải BS bị từ chối quyền cột (ORA-01031) trên CHANDOAN/DIEUTRI/KETLUAN.
-AUDIT UPDATE ON BVADMIN.HSBA BY ACCESS WHENEVER NOT SUCCESSFUL;
-
--- Kết hợp FGA: audit khi user KHÔNG phải BS mà vẫn UPDATE thành công
--- (trường hợp bỏ qua VPD - cần ghi vết)
+-- UPDATE HSBA THẤT BẠI của mọi user (tình huống C: DPV cố sửa CHANDOAN) ĐÃ được bắt bởi
+-- unified policy pol_illegal_hsba ở PHẦN 2 (ghi vào UNIFIED_AUDIT_TRAIL).
+-- Dưới đây bổ sung FGA: bắt user KHÔNG phải BS mà vẫn UPDATE THÀNH CÔNG (lọt qua VPD - cần ghi vết).
 CONNECT BVADMIN/"BVAdmin@2025";
 BEGIN
     DBMS_FGA.ADD_POLICY(
@@ -283,33 +289,37 @@ DELETE FROM BVADMIN.HSBA_DV WHERE MAHSBA = 'HS001';
 -- ============================================================
 -- PHẦN 5: ĐỌC XUẤT DỮ LIỆU KIỂM TOÁN
 -- ============================================================
-CONNECT SYSTEM/oracle;
+CONNECT SYS/&&sys_pwd AS SYSDBA;
+SET LINESIZE 160
+COL dbusername  FORMAT A14
+COL action_name FORMAT A12
+COL object_name FORMAT A12
+COL ts          FORMAT A20
+COL sql_text    FORMAT A50
 
--- 5.1 Standard Audit - tất cả
-SELECT USERNAME,
-       ACTION_NAME,
-       OBJ_NAME,
-       TIMESTAMP,
-       RETURNCODE,            -- 0=thành công, <> 0=thất bại
-       SQL_TEXT
-FROM   DBA_AUDIT_TRAIL
-WHERE  OBJ_OWNER = 'BVADMIN'
-ORDER  BY TIMESTAMP DESC
+-- 5.1 Unified Audit - 5 ngữ cảnh PHẦN 2 (đọc UNIFIED_AUDIT_TRAIL, KHÔNG phải DBA_AUDIT_TRAIL)
+SELECT DBUSERNAME, ACTION_NAME, OBJECT_NAME, RETURN_CODE,
+       TO_CHAR(EVENT_TIMESTAMP,'YYYY-MM-DD HH24:MI:SS') AS TS,
+       SUBSTR(SQL_TEXT,1,50) AS SQL_TEXT
+FROM   UNIFIED_AUDIT_TRAIL
+WHERE  UNIFIED_AUDIT_POLICIES LIKE 'POL\_%' ESCAPE '\'
+ORDER  BY EVENT_TIMESTAMP DESC
 FETCH FIRST 50 ROWS ONLY;
 
--- 5.2 Standard Audit - chỉ thao tác thất bại (bất hợp pháp)
-SELECT USERNAME, ACTION_NAME, OBJ_NAME, TIMESTAMP, RETURNCODE
-FROM   DBA_AUDIT_TRAIL
-WHERE  OBJ_OWNER = 'BVADMIN'
-  AND  RETURNCODE != 0
-ORDER  BY TIMESTAMP DESC;
+-- 5.2 Chỉ thao tác / đăng nhập THẤT BẠI (RETURN_CODE <> 0)
+SELECT DBUSERNAME, ACTION_NAME, OBJECT_NAME, RETURN_CODE,
+       TO_CHAR(EVENT_TIMESTAMP,'YYYY-MM-DD HH24:MI:SS') AS TS
+FROM   UNIFIED_AUDIT_TRAIL
+WHERE  UNIFIED_AUDIT_POLICIES LIKE 'POL\_%' ESCAPE '\'
+  AND  RETURN_CODE <> 0
+ORDER  BY EVENT_TIMESTAMP DESC
+FETCH FIRST 50 ROWS ONLY;
 
--- 5.3 Đăng nhập thất bại
-SELECT USERNAME, TIMESTAMP, RETURNCODE, USERHOST, OS_USERNAME
-FROM   DBA_AUDIT_TRAIL
-WHERE  ACTION_NAME = 'LOGON'
-  AND  RETURNCODE != 0
-ORDER  BY TIMESTAMP DESC;
+-- 5.3 Đăng nhập thất bại (policy pol_logon_fail)
+SELECT DBUSERNAME, TO_CHAR(EVENT_TIMESTAMP,'YYYY-MM-DD HH24:MI:SS') AS TS, RETURN_CODE, USERHOST
+FROM   UNIFIED_AUDIT_TRAIL
+WHERE  UNIFIED_AUDIT_POLICIES = 'POL_LOGON_FAIL'
+ORDER  BY EVENT_TIMESTAMP DESC;
 
 -- 5.4 FGA Audit - tất cả thao tác được FGA ghi lại
 SELECT DB_USER,
