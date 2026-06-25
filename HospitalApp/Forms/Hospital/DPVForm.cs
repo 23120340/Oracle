@@ -21,7 +21,11 @@ public class DPVForm : Form
     private DataGridView _dgvBN = null!;
     private TextBox _txtMABN, _txtTENBN, _txtCCCD, _txtDiaChi = null!;
     private ComboBox _cmbPhai = null!;
-    private DateTimePicker _dtpNgaySinh = null!;
+    private DateBox _dtpNgaySinh = null!;
+    // Mask CCCD ở panel DPV: giữ giá trị THẬT riêng (_cccdReal); ô chỉ hiển thị mask khi chưa "lộ".
+    private string _cccdReal  = "";
+    private bool   _cccdShown = false;
+    private Label  _btnEyeCccd = null!;
     private Button _btnSaveBN = null!, _btnNewBN = null!, _btnDelBN = null!;
     private bool _isNewBN;
 
@@ -46,7 +50,7 @@ public class DPVForm : Form
         // silence nullable warnings for fields initialized in BuildUI
         _txtMABN = _txtTENBN = _txtCCCD = _txtDiaChi = new TextBox();
         _cmbPhai = new ComboBox();
-        _dtpNgaySinh = new DateTimePicker();
+        _dtpNgaySinh = new DateBox();
 
         BuildUI();
         WireShortcuts();
@@ -338,16 +342,26 @@ public class DPVForm : Form
         AddInputRow(_cmbPhai, 28);
 
         AddLabelRow(Lbl("Ngày sinh:"));
-        _dtpNgaySinh = new DateTimePicker
-        {
-            Format = DateTimePickerFormat.Custom,
-            CustomFormat = "   dd / MM / yyyy",   // FIX: thêm khoảng trống trái → số ngày không bị viền che
-            Font = UiTheme.Body()
-        };
+        // Ô ngày tự vẽ: TextField có lề trái thật + lịch thả xuống (DTP gốc cắt mất số đầu trên Win11).
+        _dtpNgaySinh = new DateBox();
         AddInputRow(_dtpNgaySinh, 30);
 
         AddLabelRow(Lbl("CCCD:"));
-        _txtCCCD  = TB(200); AddInputRow(_txtCCCD);
+        _txtCCCD = TB(200);
+        _txtCCCD.BackColor = Color.White;   // giữ trắng kể cả khi ReadOnly (lúc mask)
+        _txtCCCD.TextChanged += (_, _) => { if (_cccdShown) _cccdReal = _txtCCCD.Text; };
+        _btnEyeCccd = new Label
+        {
+            Text = IconRegistry.Eye, Dock = DockStyle.Right, Width = 38,
+            TextAlign = ContentAlignment.MiddleCenter, Font = IconRegistry.Icon(12f),
+            ForeColor = UiTheme.TextMuted, Cursor = Cursors.Hand, BackColor = UiTheme.Surface
+        };
+        _btnEyeCccd.Click += (_, _) => { _cccdShown = !_cccdShown; ApplyCccdMask(); };
+        var cccdRow = new Panel { Height = 32, BackColor = UiTheme.Surface, Margin = Padding.Empty };
+        _txtCCCD.Dock = DockStyle.Fill;
+        cccdRow.Controls.Add(_btnEyeCccd);   // Dock=Right thêm trước
+        cccdRow.Controls.Add(_txtCCCD);      // Dock=Fill thêm sau → chiếm phần còn lại
+        AddInputRow(cccdRow, 32);
         AddLabelRow(Lbl("Địa chỉ:"));
         _txtDiaChi = TB(300); AddInputRow(_txtDiaChi);
 
@@ -421,7 +435,9 @@ public class DPVForm : Form
             _cmbPhai.Text    = r["PHAI"]?.ToString() ?? "M";
             if (r["NGAYSINH"] != DBNull.Value)
                 _dtpNgaySinh.Value = Convert.ToDateTime(r["NGAYSINH"]);
-            _txtCCCD.Text    = r["CCCD"]?.ToString() ?? "";
+            _cccdReal  = r["CCCD"]?.ToString() ?? "";
+            _cccdShown = false;            // mặc định mask khi xem hồ sơ BN
+            ApplyCccdMask();
             _txtDiaChi.Text  = r["DIACHI"]?.ToString() ?? "";
             _txtMABN.ReadOnly = true;
         });
@@ -432,7 +448,8 @@ public class DPVForm : Form
         // MABN tự sinh khi lưu (SEQ_BENHNHAN) → khoá ô, không cho gõ tay
         _txtMABN.ReadOnly = true;
         _txtMABN.Text = "(tự sinh khi lưu)";
-        _txtTENBN.Clear(); _txtCCCD.Clear(); _txtDiaChi.Clear();
+        _txtTENBN.Clear(); _txtDiaChi.Clear();
+        _cccdReal = ""; _cccdShown = true; ApplyCccdMask();   // thêm BN: ô CCCD trống, cho gõ trực tiếp
         _dtpNgaySinh.Value = DateTime.Today.AddYears(-30);
         _cmbPhai.SelectedIndex = 0;
     }
@@ -446,7 +463,7 @@ public class DPVForm : Form
                 // MABN tự sinh trong proc → chỉ cần Họ tên + CCCD hợp lệ
                 if (string.IsNullOrWhiteSpace(_txtTENBN.Text))
                 { ShowError("Nhập họ tên bệnh nhân."); return; }
-                if (!System.Text.RegularExpressions.Regex.IsMatch(_txtCCCD.Text.Trim(), @"^\d{12}$"))
+                if (!System.Text.RegularExpressions.Regex.IsMatch(_cccdReal.Trim(), @"^\d{12}$"))
                 { ShowError("CCCD phải đúng 12 chữ số."); return; }
 
                 // Gọi procedure tạo BN + Oracle account (TC#1). p_mabn IN OUT = NULL → proc tự sinh & trả về.
@@ -465,7 +482,7 @@ public class DPVForm : Form
                 cmd.Parameters.Add(OracleHelper.Param("p_tenbn",     _txtTENBN.Text.Trim()));
                 cmd.Parameters.Add(OracleHelper.Param("p_phai",      _cmbPhai.Text));
                 cmd.Parameters.Add(OracleHelper.Param("p_ngaysinh",  _dtpNgaySinh.Value));
-                cmd.Parameters.Add(OracleHelper.Param("p_cccd",      _txtCCCD.Text.Trim()));
+                cmd.Parameters.Add(OracleHelper.Param("p_cccd",      _cccdReal.Trim()));
                 cmd.Parameters.Add(OracleHelper.Param("p_sonha",     DBNull.Value));
                 cmd.Parameters.Add(OracleHelper.Param("p_tenduong",  DBNull.Value));
                 cmd.Parameters.Add(OracleHelper.Param("p_quanhuyen", DBNull.Value));
@@ -493,7 +510,7 @@ public class DPVForm : Form
                     OracleHelper.Param("t",  _txtTENBN.Text.Trim()),
                     OracleHelper.Param("p",  _cmbPhai.Text),
                     OracleHelper.Param("n",  _dtpNgaySinh.Value),
-                    OracleHelper.Param("c",  _txtCCCD.Text.Trim()),
+                    OracleHelper.Param("c",  _cccdReal.Trim()),
                     OracleHelper.Param("tp", _txtDiaChi.Text.Trim()),
                     OracleHelper.Param("m",  _txtMABN.Text.Trim()));
                 Toast.Show(this, "Đã cập nhật bệnh nhân", Toast.Kind.Success);
@@ -692,7 +709,11 @@ public class DPVForm : Form
         };
 
         var dvBottom = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, Margin = Padding.Empty };
-        _btnAssignKTV = Btn("Giao KTV cho dịch vụ", UiTheme.HealthGreen, width: 190);
+        _btnAssignKTV = Btn("Giao dịch vụ cho KTV", UiTheme.HealthGreen, width: 210);
+        // AutoSize → nút tự giãn theo độ dài chữ ở MỌI mức DPI (không bị cắt "KTV").
+        _btnAssignKTV.AutoSize = true;
+        _btnAssignKTV.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        _btnAssignKTV.Padding = new Padding(18, 0, 18, 0);
         _btnAssignKTV.Dock = DockStyle.Right;
         _btnAssignKTV.Click += BtnAssignKTV_Click;
         dvBottom.Controls.Add(_btnAssignKTV);
@@ -845,7 +866,7 @@ public class DPVForm : Form
             var loaidv = _dgvDV.CurrentRow.Cells["LOAIDV"].Value?.ToString();
 
             var maktv = Microsoft.VisualBasic.Interaction.InputBox(
-                "Nhập Mã KTV:", "Giao KTV", "");
+                "Nhập Mã KTV:", "Giao dịch vụ cho KTV", "");
             if (string.IsNullOrEmpty(maktv)) return;
 
             _db.Execute(
@@ -943,6 +964,23 @@ public class DPVForm : Form
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     private static DataGridView MakeGrid() => UiTheme.Grid();
+
+    // Cập nhật hiển thị ô CCCD theo trạng thái lộ/mask. Giá trị THẬT luôn nằm ở _cccdReal.
+    private void ApplyCccdMask()
+    {
+        if (_cccdShown)
+        {
+            _txtCCCD.Text     = _cccdReal;              // hiện đầy đủ, cho sửa
+            _txtCCCD.ReadOnly = false;
+            _btnEyeCccd.Text  = IconRegistry.EyeHide;   // bấm để ẩn lại
+        }
+        else
+        {
+            _txtCCCD.Text     = InputValidator.MaskCccd(_cccdReal);  // ••••••1234
+            _txtCCCD.ReadOnly = true;                   // khoá để không gõ đè lên chuỗi mask
+            _btnEyeCccd.Text  = IconRegistry.Eye;       // bấm để lộ
+        }
+    }
 
     private static Label Lbl(string text) =>
         new() { Text = text, AutoSize = true, Font = UiTheme.Body(),

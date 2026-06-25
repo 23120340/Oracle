@@ -377,7 +377,8 @@ public class BNForm : Form
             var r = dt.Rows[0];
             _lblMABN.Text      = r["MABN"]?.ToString()     ?? "";
             _lblTENBN.Text     = r["TENBN"]?.ToString()    ?? "";
-            _lblCCCD.Text      = r["CCCD"]?.ToString()     ?? "";
+            // Bảo mật: BN chỉ xem CCCD của mình ở dạng mask 4 số cuối (chỉ DPV mới thấy full).
+            _lblCCCD.Text      = InputValidator.MaskCccd(r["CCCD"]?.ToString());
             _lblPhai.Text      = r["PHAI"]?.ToString()     == "M" ? "Nam" : "Nữ";
             _lblNgaySinh.Text  = r["NGAYSINH"]?.ToString() ?? "";
             _txtSoNha.Text     = r["SONHA"]?.ToString()    ?? "";
