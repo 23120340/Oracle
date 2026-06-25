@@ -10,7 +10,7 @@
 --
 -- CHẠY (CONNECT thật, KHÔNG qua setup.ps1). Trong PowerShell:
 --   $env:NLS_LANG = ".AL32UTF8"
---   sqlplus /nolog "@d:\repos\Oracle\PhanHe2\fix_benhnhan_account.sql"
+--   sqlplus /nolog "@d:\repos\Oracle\PhanHe2\extras\fix_benhnhan_account.sql"
 -- >>> SỬA mật khẩu SYS cho khớp DB của bạn ở dòng CONNECT bên dưới.
 -- ============================================================
 SET DEFINE OFF

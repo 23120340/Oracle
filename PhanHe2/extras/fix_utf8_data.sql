@@ -1,5 +1,5 @@
 -- ============================================================
--- PHÂN HỆ 2 - File 12: SỬA dữ liệu tiếng Việt bị hỏng encoding
+-- PHÂN HỆ 2 - (extras) SỬA dữ liệu tiếng Việt bị hỏng encoding
 -- ============================================================
 -- Khi user chạy 01_schema_data.sql qua SQL*Plus mà KHÔNG set
 -- NLS_LANG=.AL32UTF8 trước, bytes UTF-8 trong file bị Oracle
@@ -17,7 +17,7 @@
 --
 -- Chạy với user BVADMIN (chủ schema):
 --   sqlplus BVADMIN/<BVADMIN_pass>@//localhost:1521/XEPDB1
---   SQL> @12_Fix_UTF8_Data.sql
+--   SQL> @extras/fix_utf8_data.sql   (đang nằm trong thư mục extras/)
 -- ============================================================
 -- KHÔNG dùng CONNECT — script chạy với session hiện tại
 SET DEFINE OFF

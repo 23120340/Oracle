@@ -70,7 +70,7 @@ ORDER BY EXTENDED_TIMESTAMP DESC FETCH FIRST 20 ROWS ONLY;
 Chay:
 
 ```sql
-@PhanHe2/09_Recovery_Demo.sql
+@PhanHe2/extras/recovery_demo.sql
 ```
 
 Chup lai cac moc: count truoc khi xoa, audit/FGA, SCN checkpoint, count sau Flashback.

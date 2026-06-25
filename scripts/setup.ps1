@@ -6,8 +6,7 @@ param(
     [string]$BvAdminPass = "BVAdmin@2025",
     [string]$LbacsysPass = "lbacsys",
     [switch]$Reset,
-    [switch]$AppOnly,
-    [switch]$SkipRecoveryDemo
+    [switch]$AppOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -159,7 +158,7 @@ foreach ($script in $scripts) {
 # View tra cứu + grant tổng hợp — chạy trong schema BVADMIN (các file này không có CONNECT nội bộ)
 foreach ($g in @(
         "PhanHe2\11_NV_Lookup_Grants.sql",
-        "PhanHe2\13_Audit_Grants.sql",
+        "PhanHe2\12_Audit_Grants.sql",
         "PhanHe2\setup_all.sql"
     )) {
     Invoke-SqlScript -User "sys" -Password $SysPass -ScriptPath $g -AsSysDba -Schema "BVADMIN"
@@ -167,9 +166,5 @@ foreach ($g in @(
 
 # Tài khoản DBA cho AdminDashboard (Phân hệ 1)
 Invoke-SqlScript -User "sys" -Password $SysPass -ScriptPath "PhanHe2\setup_admin_user.sql" -AsSysDba
-
-if (-not $SkipRecoveryDemo) {
-    Invoke-SqlScript -User "sys" -Password $SysPass -ScriptPath "PhanHe2\09_Recovery_Demo.sql" -AsSysDba
-}
 
 Write-Host "Done." -ForegroundColor Green

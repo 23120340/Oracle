@@ -8,7 +8,8 @@
 # Script sẽ:
 #  1) Set NLS_LANG = .AL32UTF8 (đảm bảo UTF-8)
 #  2) Hỏi mật khẩu SYSTEM (kết nối khởi đầu) và SYS (cho các bước SYSDBA)
-#  3) Chạy lần lượt 01 → 13 + setup_all, mỗi file dừng ngay nếu gặp lỗi SQL
+#  3) Chạy lần lượt 01 → 12 + setup_all, mỗi file dừng ngay nếu gặp lỗi SQL
+#     (13_TDE_Encryption chạy riêng/thủ công vì cần keystore — xem docs/guides/SETUP_ENCRYPTION.md)
 #
 # LƯU Ý QUAN TRỌNG (xem REVIEW_LOI_PHANHE2.md mục B10):
 #   Các file .sql có lệnh CONNECT nội bộ với mật khẩu CỐ ĐỊNH:
@@ -56,8 +57,7 @@ $migrations = @(
     "09_OLS_NhanVien_Unified.sql",   # NV_NHANVIEN_View 12 cột + nhãn OLS nhân viên
     "10_XE_App_Demo_Fix.sql",        # fix account mapping cho XE
     "11_NV_Lookup_Grants.sql",       # NV_LOOKUP_View + grants
-    "12_Fix_UTF8_Data.sql",          # sửa dữ liệu Việt nếu lệch encoding
-    "13_Audit_Grants.sql",           # grant SELECT bảng log
+    "12_Audit_Grants.sql",           # grant SELECT bảng log
     "setup_all.sql"                  # tổng hợp views + grants (chạy sau cùng)
 )
 

@@ -1,5 +1,5 @@
 -- ============================================================
--- PHÂN HỆ 2 - File 15: Mã hóa DỮ LIỆU NHẠY CẢM at-rest bằng TDE
+-- PHÂN HỆ 2 - File 13: Mã hóa DỮ LIỆU NHẠY CẢM at-rest bằng TDE
 -- (Transparent Data Encryption) — bổ sung tầng "cryptography" cho access-control
 -- ============================================================
 -- ⚠️ File này CHỨA MẬT KHẨU THẬT (chỉ dùng local) — KHÔNG đẩy lên repo công khai.
@@ -19,7 +19,7 @@
 -- ⚠️ Mật khẩu keystore (TdeWallet2025x) TỐI QUAN TRỌNG: mất = MẤT dữ liệu mã hóa.
 --    Sao lưu cả thư mục wallet (ewallet.p12, cwallet.sso) cùng dữ liệu.
 --
--- Cách chạy (PowerShell):  $env:NLS_LANG=".AL32UTF8"; sqlplus /nolog "@...\15_TDE_Encryption.sql"
+-- Cách chạy (PowerShell):  $env:NLS_LANG=".AL32UTF8"; sqlplus /nolog "@...\13_TDE_Encryption.sql"
 -- ============================================================
 SET DEFINE OFF
 WHENEVER SQLERROR CONTINUE

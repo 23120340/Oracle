@@ -9,7 +9,7 @@
 --
 -- CHẠY (giữ nguyên dữ liệu, KHÔNG cần -Reset), với tư cách BVADMIN:
 --   set NLS_LANG=.AL32UTF8
---   sqlplus BVADMIN/"BVAdmin@2025"@localhost:1521/XEPDB1 @PhanHe2/fix_fga_ora28138.sql
+--   sqlplus BVADMIN/"BVAdmin@2025"@localhost:1521/XEPDB1 @PhanHe2/extras/fix_fga_ora28138.sql
 -- (Hoặc chạy lại toàn bộ file 06_YC3_Audit.sql — đã idempotent.)
 -- ============================================================
 SET DEFINE OFF

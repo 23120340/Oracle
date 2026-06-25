@@ -1,5 +1,5 @@
 -- ============================================================
--- PHÂN HỆ 2 - File 13: Grant SELECT cho audit log tables
+-- PHÂN HỆ 2 - File 12: Grant SELECT cho audit log tables
 -- ============================================================
 -- Cho phép DPV/BS/KTV xem nhật ký audit:
 --   • APP_LOGIN_LOG      — đăng nhập ứng dụng (file 08)
@@ -9,7 +9,7 @@
 -- ============================================================
 -- Chạy với BVADMIN (owner của log tables) — không cần SYSTEM:
 --   sqlplus BVADMIN/<BVADMIN_pass>@//localhost:1521/XEPDB1
---   SQL> @13_Audit_Grants.sql
+--   SQL> @12_Audit_Grants.sql
 -- ============================================================
 
 GRANT SELECT ON APP_LOGIN_LOG    TO DPV_Role;

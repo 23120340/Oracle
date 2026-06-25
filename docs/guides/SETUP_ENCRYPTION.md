@@ -70,11 +70,11 @@ New-Item -ItemType Directory "D:\Oracle\admin\XE\wallet" -Force
 > (Phương án khác: `ALTER SYSTEM SET WALLET_ROOT='D:\Oracle\wallet' SCOPE=SPFILE;` rồi **restart DB** — bài này không dùng.)
 
 ### 2.2. Chạy script
-`PhanHe2/15_TDE_Encryption.sql` đã điền sẵn giá trị cho máy demo (`D:\Oracle\admin\XE\wallet`,
+`PhanHe2/13_TDE_Encryption.sql` đã điền sẵn giá trị cho máy demo (`D:\Oracle\admin\XE\wallet`,
 keystore password `TdeWallet2025x`). Nếu máy khác, sửa lại đường dẫn + mật khẩu rồi chạy:
 ```powershell
 $env:NLS_LANG = ".AL32UTF8"
-sqlplus /nolog "@d:\repos\Oracle\PhanHe2\15_TDE_Encryption.sql"
+sqlplus /nolog "@d:\repos\Oracle\PhanHe2\13_TDE_Encryption.sql"
 ```
 Script: tạo keystore → mở (CONTAINER=ALL) → đặt master key **root rồi PDB** → tạo **auto-login**
 (DB tự mở keystore khi khởi động) → `ALTER TABLE … ENCRYPT` → in danh sách cột mã hóa.

@@ -7,8 +7,13 @@
 -- KHÔNG nhận đúng nhãn → user thường (u1..u8) đọc ra 0 dòng.
 --
 -- CÁCH CHẠY (BẮT BUỘC dùng CONNECT thật, KHÔNG chạy qua setup.ps1):
---   set NLS_LANG=.AL32UTF8
---   sqlplus /nolog @PhanHe2/fix_ols_thongbao.sql
+--   PowerShell:  $env:NLS_LANG = ".AL32UTF8"     <-- PHẢI dùng cú pháp này
+--                sqlplus /nolog "@PhanHe2/extras/fix_ols_thongbao.sql"
+--   ⚠️ `set NLS_LANG=...` (cú pháp cmd) KHÔNG có tác dụng trong PowerShell → các literal N'...'
+--      bị ghi SAI charset (mojibake "ThÃ´ng bÃ¡o"). File này cũng phải được lưu dạng UTF-8.
+--   ⚠️ Cách chống charset tuyệt đối (không phụ thuộc NLS_LANG/BOM): chèn bằng UNISTR('\xxxx')
+--      thuần ASCII — vd N'Hội' -> UNISTR('H\1ed9i'). Dữ liệu lỗi trên DB này đã được vá lại
+--      bằng cách đó (sinh UNISTR từ chuỗi UTF-8 rồi chạy qua sqlplus).
 -- (Sửa mật khẩu LBACSYS/BVADMIN bên dưới cho khớp DB của bạn nếu khác.)
 -- ============================================================
 SET DEFINE OFF

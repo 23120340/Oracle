@@ -36,19 +36,20 @@ Oracle/
 │   ├── 07_YC4_Backup_Recovery.sql← RMAN / Data Pump / Flashback
 │   ├── 08_App_Migrations.sql    ← Sequence, APP_LOGIN_LOG, proc tạo BN
 │   ├── 09_OLS_NhanVien_Unified.sql ← Cột CAPBAC/COSO/KHOA_NHAN + gán nhãn OLS nhân viên + NV_NHANVIEN_View
-│   ├── 09_Recovery_Demo.sql     ← Demo phục hồi Flashback (chạy khi vấn đáp)
 │   ├── 10_XE_App_Demo_Fix.sql   ← Sửa account mapping cho Oracle XE
 │   ├── 11_NV_Lookup_Grants.sql  ← NV_LOOKUP_View (DPV/BS tra cứu nhân viên)
-│   ├── 12_Fix_UTF8_Data.sql     ← Sửa dữ liệu tiếng Việt nếu bị lệch encoding
-│   ├── 13_Audit_Grants.sql      ← Grant SELECT các bảng log
-│   ├── 15_TDE_Encryption.sql    ← (Mở rộng) Mã hóa cột nhạy cảm at-rest bằng TDE
+│   ├── 12_Audit_Grants.sql      ← Grant SELECT các bảng log
+│   ├── 13_TDE_Encryption.sql    ← (Mở rộng) Mã hóa cột nhạy cảm at-rest bằng TDE (chạy thủ công)
 │   ├── setup_all.sql            ← Tổng hợp view + grant (chạy SAU CÙNG, bằng BVADMIN)
 │   ├── setup_admin_user.sql     ← Tạo HOSPITAL_DBA (tài khoản vào AdminDashboard)
-│   ├── fix_fga_ora28138.sql     ← Hotfix ORA-28138 (FGA predicate đơn) — chạy bằng BVADMIN, không cần -Reset
-│   ├── fix_ols_thongbao.sql     ← Hotfix gán nhãn OLS cho THONGBAO (u1–u8 không thấy thông báo)
-│   ├── fix_benhnhan_account.sql ← Hotfix: DPV tạo BN mới + tự tạo tài khoản đăng nhập (auto-MABN)
 │   ├── run_migrations.ps1       ← Runner chạy 01→13 + setup_all
-│   └── REVIEW_LOI_PHANHE2.md    ← Báo cáo rà soát lỗi + trạng thái sửa (checklist)
+│   ├── REVIEW_LOI_PHANHE2.md    ← Báo cáo rà soát lỗi + trạng thái sửa (checklist)
+│   └── extras/                  ← File phụ (demo + hotfix, KHÔNG bắt buộc để chạy — chạy thủ công)
+│       ├── recovery_demo.sql        ← Demo phục hồi Flashback (chạy khi vấn đáp)
+│       ├── fix_utf8_data.sql        ← Sửa dữ liệu Việt nếu lệch encoding (dư thừa khi đã set NLS_LANG)
+│       ├── fix_fga_ora28138.sql     ← Hotfix ORA-28138 (FGA predicate đơn)
+│       ├── fix_ols_thongbao.sql     ← Hotfix gán nhãn OLS cho THONGBAO (u1–u8 không thấy thông báo)
+│       └── fix_benhnhan_account.sql ← Hotfix: DPV tạo BN mới + tự tạo tài khoản (auto-MABN)
 │
 ├── scripts/setup.ps1            ← Runner nhanh (01→10 bằng SYS)
 ├── docs/
@@ -148,8 +149,8 @@ cd D:\repos\Oracle
 .\scripts\setup.ps1 -HostName localhost -Port 1521 -Sid XEPDB1 -SysPass "<mat_khau_SYS>" -Reset
 ```
 
-Tham số: `-AppOnly` (bỏ audit/backup), `-SkipRecoveryDemo` (bỏ demo phục hồi),
-`-BvAdminPass`, `-LbacsysPass`.
+Tham số: `-AppOnly` (bỏ audit/backup), `-BvAdminPass`, `-LbacsysPass`.
+(Demo phục hồi & các fix nay nằm ở `PhanHe2/extras/` — chạy thủ công khi cần, runner không tự gọi.)
 
 > ⚠️ **Phải dùng `-Reset` khi chạy lại** — nếu DB đã có `BVADMIN`/role từ lần trước, chạy lại
 > không `-Reset` sẽ báo `ORA-01920`/`ORA-00955`/`ORA-00947`.
@@ -172,9 +173,9 @@ sqlplus 'BVADMIN/"BVAdmin@2025"@//localhost:1521/XEPDB1'
 ```
 ```sql
 @PhanHe2/11_NV_Lookup_Grants.sql   -- NV_LOOKUP_View cho DPV/BS
-@PhanHe2/13_Audit_Grants.sql       -- grant SELECT bảng log
+@PhanHe2/12_Audit_Grants.sql       -- grant SELECT bảng log
 @PhanHe2/setup_all.sql             -- tổng hợp view + grant cuối cùng
-@PhanHe2/12_Fix_UTF8_Data.sql      -- (chỉ khi) dữ liệu Việt mẫu bị lệch dấu
+@PhanHe2/extras/fix_utf8_data.sql  -- (chỉ khi) dữ liệu Việt mẫu bị lệch dấu
 EXIT
 ```
 
@@ -313,10 +314,10 @@ User u1–u8 được gán `max_read_label` tương ứng (xem file 05). User u1
 > 2. Policy chỉ bật `READ_CONTROL` nên `SA_SESSION.SET_ROW_LABEL` **không** tự gán nhãn khi INSERT —
 >    phải gán thẳng `OLS_LABEL = CHAR_TO_LABEL('BV_LABEL_POLICY', '<nhãn>')` trong câu INSERT.
 >
-> **Cách sửa nhanh** — chạy [PhanHe2/fix_ols_thongbao.sql](PhanHe2/fix_ols_thongbao.sql) bằng CONNECT thật:
+> **Cách sửa nhanh** — chạy [PhanHe2/extras/fix_ols_thongbao.sql](PhanHe2/extras/fix_ols_thongbao.sql) bằng CONNECT thật:
 > ```powershell
 > $env:NLS_LANG = ".AL32UTF8"   # PowerShell — KHÔNG dùng "set" (xem §3)
-> sqlplus /nolog "@d:\repos\Oracle\PhanHe2\fix_ols_thongbao.sql"
+> sqlplus /nolog "@d:\repos\Oracle\PhanHe2\extras\fix_ols_thongbao.sql"
 > ```
 > Yêu cầu trước đó: đã đặt mật khẩu LBACSYS (§4) và BVADMIN có quyền FULL (script tự cấp).
 > Kết quả đúng: cột `OLS_LABEL` in ra **có số** → đăng nhập `u1_giamdoc/U1@2025` thấy đủ 7 thông báo.
@@ -335,14 +336,14 @@ User u1–u8 được gán `max_read_label` tương ứng (xem file 05). User u1
 |-------------|------|---------|
 | RMAN Full / Incremental | Physical | Job Scheduler gọi `.bat` (mặc định **chưa bật** — bật sau khi cấu hình đường dẫn) |
 | Data Pump (expdp) | Logical | Job Scheduler gọi `.bat` |
-| Flashback Table / Query | Point-in-time | Dùng undo + ROW MOVEMENT — demo ở `09_Recovery_Demo.sql` |
+| Flashback Table / Query | Point-in-time | Dùng undo + ROW MOVEMENT — demo ở `extras/recovery_demo.sql` |
 
 ### (Mở rộng) Mã hóa — Cryptography
 
 Bổ sung tầng **mã hóa** cho access-control (để có cả *access control + cryptography*):
 
 - **Mã hóa đường truyền** — Oracle Native Network Encryption (AES256 + SHA) qua `sqlnet.ora`. App `Oracle.ManagedDataAccess` tự thương lượng, không sửa code.
-- **Mã hóa dữ liệu at-rest** — TDE (Transparent Data Encryption, AES) cho cột nhạy cảm: `BENHNHAN.CCCD`, `NHANVIEN.CMND` (NO SALT → giữ UNIQUE) + `BENHNHAN.DIUNGTHUOC`. Trong suốt với app; chạy `15_TDE_Encryption.sql`. *(`TIENSUBENH/TIENSUBENHGD` không mã hóa được do giới hạn kích thước NVARCHAR2 — `ORA-28331`.)*
+- **Mã hóa dữ liệu at-rest** — TDE (Transparent Data Encryption, AES) cho cột nhạy cảm: `BENHNHAN.CCCD`, `NHANVIEN.CMND` (NO SALT → giữ UNIQUE) + `BENHNHAN.DIUNGTHUOC`. Trong suốt với app; chạy `13_TDE_Encryption.sql`. *(`TIENSUBENH/TIENSUBENHGD` không mã hóa được do giới hạn kích thước NVARCHAR2 — `ORA-28331`.)*
 
 → Chi tiết từng bước + kiểm chứng: **[docs/guides/SETUP_ENCRYPTION.md](docs/guides/SETUP_ENCRYPTION.md)**.
 
@@ -375,10 +376,10 @@ Tất cả kiểm soát truy cập do **Oracle DB Engine** thực thi (RBAC + VP
 | `PLS-00103 Encountered end-of-file` ở `EXEC ...` (file 02) | Comment `--` cùng dòng `EXEC` nuốt mất `END;` → **đã sửa** (bỏ comment cuối dòng); dùng bản file 02 mới |
 | `ORA-00933 SQL command not properly ended` ở câu GRANT/ALTER | Có comment `--` ngay sau `;` trên cùng dòng → SQL\*Plus không nhận `;` là dấu kết thúc → **đã sửa** (đưa comment lên dòng riêng) |
 | `Enter value for ...:` (prompt đứng im) | Ký tự `&` trong comment/chuỗi bị hiểu là biến thay thế → **đã sửa** (`setup.ps1` tự `SET DEFINE OFF`; bỏ `&` trong comment). Đang kẹt: bấm **Ctrl+C** để thoát |
-| Tiếng Việt thành `???` / lỗi dấu trong DB | Chưa đặt `NLS_LANG=.AL32UTF8` trước khi chạy 01 → chạy lại sau khi set, hoặc chạy `12_Fix_UTF8_Data.sql` bằng BVADMIN |
+| Tiếng Việt thành `???` / lỗi dấu trong DB | Chưa đặt `NLS_LANG=.AL32UTF8` trước khi chạy 01 → chạy lại sau khi set, hoặc chạy `extras/fix_utf8_data.sql` bằng BVADMIN |
 | Tiếng Việt thành `ThÃ´ng bÃ¡o` khi chạy file `.sql` bằng `sqlplus` trong **PowerShell** | Đã gõ `set NLS_LANG=...` (cú pháp CMD, vô tác dụng trong PowerShell) → sqlplus đọc UTF-8 sai. Dùng `$env:NLS_LANG = ".AL32UTF8"` rồi chạy lại trong cùng cửa sổ (xem §3) |
-| Đăng nhập u1–u8 OLS **không thấy thông báo nào** | `THONGBAO.OLS_LABEL` đang NULL (nhãn chưa gán) → chạy `PhanHe2/fix_ols_thongbao.sql` bằng CONNECT thật (xem §8 – Yêu cầu 2) |
-| DPV tạo bệnh nhân mới **nhưng tài khoản đăng nhập không tạo được** (báo `ORA-01031`) | BVADMIN thiếu quyền cấp `CREATE SESSION` cho tài khoản BN mới → chạy `PhanHe2/fix_benhnhan_account.sql` (cấp `CREATE SESSION ... WITH ADMIN OPTION` + viết lại `sp_create_benhnhan_full` an toàn, MABN tự sinh) |
+| Đăng nhập u1–u8 OLS **không thấy thông báo nào** | `THONGBAO.OLS_LABEL` đang NULL (nhãn chưa gán) → chạy `PhanHe2/extras/fix_ols_thongbao.sql` bằng CONNECT thật (xem §8 – Yêu cầu 2) |
+| DPV tạo bệnh nhân mới **nhưng tài khoản đăng nhập không tạo được** (báo `ORA-01031`) | BVADMIN thiếu quyền cấp `CREATE SESSION` cho tài khoản BN mới → chạy `PhanHe2/extras/fix_benhnhan_account.sql` (cấp `CREATE SESSION ... WITH ADMIN OPTION` + viết lại `sp_create_benhnhan_full` an toàn, MABN tự sinh) |
 | `ORA-65066: must apply to all containers` khi `ALTER USER LBACSYS` | LBACSYS là common user → đổi từ **CDB root** (`@.../XE`) + `CONTAINER=ALL` (xem §4) |
 | `ORA-12660` khi app kết nối sau khi bật NNE | Server đặt `ENCRYPTION_SERVER=REQUIRED` nhưng client không thỏa → tạm hạ `REQUESTED` (xem SETUP_ENCRYPTION.md §1.3) |
 | `ORA-28365: wallet is not open` sau khi bật TDE | Keystore chưa mở (thường do restart DB mà chưa tạo auto-login) → tạo **auto-login keystore** hoặc mở tay `ADMINISTER KEY MANAGEMENT SET KEYSTORE OPEN ...` (SETUP_ENCRYPTION.md §2.4) |
@@ -386,7 +387,7 @@ Tất cả kiểm soát truy cập do **Oracle DB Engine** thực thi (RBAC + VP
 | Tiếng Việt lỗi dấu trên giao diện | Dùng bản app mới (đã đổi `TO_CHAR`→`TO_NCHAR` + bind `NVarchar2`); rebuild lại |
 | File 05 lỗi `SA_*`/`LBACSYS` | OLS chưa được cài/mở khoá → xem §4 |
 | `ORA-01017 invalid username/password` khi chạy script | Mật khẩu CONNECT trong file chưa khớp DB → sửa lại (SYS/SYSTEM/LBACSYS/BVADMIN) — xem §2 |
-| **`ORA-28138`** khi BS *thêm dịch vụ chẩn đoán* hoặc KTV *lưu kết quả* | `audit_condition` của FGA chứa `OR`/`NOT IN` (Oracle chỉ cho 1 predicate đơn) → **đã sửa** (file 06 bọc logic vào hàm `fn_is_illegal_hsba*` trả `'Y'/'N'`). Áp dụng nhanh không cần `-Reset`: chạy `PhanHe2/fix_fga_ora28138.sql` bằng `BVADMIN`, hoặc `setup.ps1 -Reset` |
+| **`ORA-28138`** khi BS *thêm dịch vụ chẩn đoán* hoặc KTV *lưu kết quả* | `audit_condition` của FGA chứa `OR`/`NOT IN` (Oracle chỉ cho 1 predicate đơn) → **đã sửa** (file 06 bọc logic vào hàm `fn_is_illegal_hsba*` trả `'Y'/'N'`). Áp dụng nhanh không cần `-Reset`: chạy `PhanHe2/extras/fix_fga_ora28138.sql` bằng `BVADMIN`, hoặc `setup.ps1 -Reset` |
 | Đăng nhập app bằng `SYSTEM` báo `ORA-01017` | Mật khẩu `oracle` chỉ là **giả định** — nhập đúng mật khẩu SYSTEM thật của bạn; hoặc dùng `HOSPITAL_DBA/Hospital@DBA2025` (xem §6) |
 | Đăng nhập app báo `ORA-28000`/`ORA-28001` | Tài khoản bị **khoá** / mật khẩu **hết hạn** ở DB → `ALTER USER <user> ACCOUNT UNLOCK;` (và đặt lại mật khẩu nếu cần) bằng SYS/SYSTEM |
 | Đăng nhập app báo "Tài khoản tạm khoá Ns" | App tự khoá 60 giây sau **5 lần sai** liên tiếp → đợi hết khoá rồi nhập đúng mật khẩu |

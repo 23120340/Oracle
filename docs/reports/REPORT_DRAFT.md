@@ -46,7 +46,30 @@ Policy `BV_LABEL_POLICY` co level `NV < LDK < BGD`, compartment `HCM/HPN/HNI`, g
 
 ### 4.6 YC4 - Backup/Recovery
 
-`07_YC4_Backup_Recovery.sql` mo ta RMAN, Data Pump, Flashback. `09_Recovery_Demo.sql` la kich ban co the chay de tao checkpoint SCN, gia lap xoa nham `HSBA_DV`, doc audit/FGA va Flashback table ve SCN.
+`07_YC4_Backup_Recovery.sql` mo ta RMAN, Data Pump, Flashback. `extras/recovery_demo.sql` la kich ban co the chay de tao checkpoint SCN, gia lap xoa nham `HSBA_DV`, doc audit/FGA va Flashback table ve SCN.
+
+### 4.7 Chinh sach truong nhay cam va che (masking)
+
+Truong nhay cam: `BENHNHAN.CCCD`, `NHANVIEN.CMND`, `BENHNHAN.TIENSUBENH / TIENSUBENHGD / DIUNGTHUOC`.
+
+Ma tran quyen XEM (theo de bai):
+
+| Truong | DPV | BS | KTV | BN | NV (chinh minh) |
+| --- | --- | --- | --- | --- | --- |
+| CCCD (benh nhan) | Xem FULL (TC#2) | Khong query | Khong | Xem cua minh, **mask 4 so** | - |
+| CMND (nhan vien) | Khong | Khong | Khong | - | Xem cua minh, **mask 4 so** |
+| Tien su / di ung | Khong hien | Xem+sua BN minh dieu tri (TC#3d) | Khong | Xem+sua cua minh | - |
+
+Quy tac che (masking) o tang ung dung (`InputValidator.MaskCccd`, hien dang `xxxxxx + 4 so cuoi`):
+- **Chi DPV** o o chi tiet duoc xem CCCD day du, vi TC#2 cho DPV "xem, them, sua du lieu tren quan he BENHNHAN" — DPV la nguoi dang ky benh nhan nen can CCCD day du de nhap va doi chieu.
+- **Moi ngu canh con lai chi hien 4 so cuoi**: luoi danh sach cua DPV, benh nhan xem CCCD cua chinh minh (`BNForm`), nhan vien xem CMND cua chinh minh (`MyProfilePanel`).
+- BS/KTV khong truy van cot CCCD (BS chi can tien su/di ung; loc dong theo VPD chi BN minh dieu tri).
+
+Ly do giu DPV xem FULL (thay vi che het) — phuong an da chon:
+- De bai TC#2 yeu cau DPV thao tac tren TOAN BO BENHNHAN; che CCCD voi DPV se can tro nghiep vu dang ky. Day la quyet dinh dung dac ta, khong phai lo hong.
+- Rui ro con lai duoc bu bang nhieu lop (defense-in-depth): VPD gioi han dong theo vai tro; TDE ma hoa at-rest CCCD/CMND/DIUNGTHUOC; Standard Audit + FGA ghi vet truy cap; va che 4 so cuoi o moi noi khong phai DPV.
+
+Lien quan tang mat ma (cryptography): CCCD, CMND duoc `ENCRYPT NO SALT` (giu UNIQUE + tim theo "="), DIUNGTHUOC `ENCRYPT` (co salt) bang TDE. TIENSUBENH/TIENSUBENHGD khong ma hoa duoc do gioi han kich thuoc NVARCHAR2 sau ma hoa (ORA-28331) nhung van duoc bao ve boi VPD + Audit. Chi tiet: `docs/guides/SETUP_ENCRYPTION.md`.
 
 ## 5. Bao mat lop ung dung
 

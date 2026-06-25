@@ -257,7 +257,7 @@ CONNECT SYS/&&sys_pwd AS SYSDBA;
 -- C6. Flashback Query: Xem dữ liệu tại thời điểm trước sự cố (không cần phục hồi toàn bộ)
 CONNECT BVADMIN/"BVAdmin@2025";
 
--- Minh hoạ (xem bản CHẠY ĐƯỢC ở 09_Recovery_Demo.sql). Lưu ý:
+-- Minh hoạ (xem bản CHẠY ĐƯỢC ở extras/recovery_demo.sql). Lưu ý:
 --   • AS OF ngay sau khi vừa đổi cấu trúc bảng → ORA-01466 (table definition has changed).
 --   • AS OF SCN KHÔNG nhận subquery trực tiếp → ORA-22818; phải lấy SCN vào biến PL/SQL trước.
 /*

@@ -75,6 +75,6 @@ Nếu DB charset KHÔNG phải AL32UTF8 (ví dụ WE8MSWIN1252), bạn cần t�
 @07_YC4_Backup_Recovery.sql      -- RMAN, DataPump, Flashback config
 @08_App_Migrations.sql           -- SEQ_HSBA, NV_NHANVIEN_View, app log
 @09_OLS_NhanVien_Unified.sql     -- (tuỳ chọn) hợp nhất OLS với NHANVIEN
-@09_Recovery_Demo.sql            -- (tuỳ chọn) demo flashback recovery
+@extras/recovery_demo.sql        -- (tuỳ chọn) demo flashback recovery
 @10_XE_App_Demo_Fix.sql          -- (nếu cần) fix cho Oracle XE
 ```

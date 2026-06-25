@@ -1,9 +1,9 @@
-﻿-- ============================================================
--- PHAN HE 2 - File 09B: Demo phuc hoi bang audit + Flashback
--- Chay sau 01-08. Can bat row movement truoc khi FLASHBACK TABLE.
+-- ============================================================
+-- PHAN HE 2 - (extras) Demo phuc hoi bang audit + Flashback
+-- Chay sau 01-08 (thu cong khi van dap). Can bat row movement truoc khi FLASHBACK TABLE.
 -- ============================================================
 
-CONNECT BVADMIN/"BVAdmin@2025";
+CONNECT BVADMIN/"BVAdmin@2025"@localhost:1521/XEPDB1
 
 ALTER TABLE HSBA_DV ENABLE ROW MOVEMENT;
 
@@ -60,7 +60,8 @@ COMMIT;
 SELECT COUNT(*) AS HSBA_DV_COUNT_AFTER_DELETE FROM HSBA_DV;
 
 PROMPT === Audit/FGA gan nhat lien quan HSBA_DV ===
-CONNECT SYSTEM/oracle;
+CONNECT / AS SYSDBA
+ALTER SESSION SET CONTAINER = XEPDB1;
 SELECT DB_USER, OBJECT_SCHEMA, OBJECT_NAME, POLICY_NAME,
        SQL_TEXT, EXTENDED_TIMESTAMP
 FROM DBA_FGA_AUDIT_TRAIL
@@ -69,7 +70,7 @@ WHERE OBJECT_SCHEMA = 'BVADMIN'
 ORDER BY EXTENDED_TIMESTAMP DESC FETCH FIRST 5 ROWS ONLY;
 
 PROMPT === Lay SCN checkpoint va phuc hoi bang HSBA_DV ===
-CONNECT BVADMIN/"BVAdmin@2025";
+CONNECT BVADMIN/"BVAdmin@2025"@localhost:1521/XEPDB1
 
 SELECT EVENT_NAME, SCN, CREATED_AT
 FROM CHECKPOINT_LOG
