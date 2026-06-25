@@ -1,0 +1,323 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{vietnam}
+\usepackage{geometry}
+\geometry{left=2.2cm,right=2.0cm,top=2.2cm,bottom=2.2cm}
+\usepackage{setspace}
+\setstretch{1.18}
+\usepackage{microtype}
+\usepackage{xcolor}
+\definecolor{mainblue}{HTML}{1D4ED8}
+\definecolor{softblue}{HTML}{EFF6FF}
+\definecolor{softgreen}{HTML}{ECFDF5}
+\definecolor{softorange}{HTML}{FFF7ED}
+\definecolor{softred}{HTML}{FEF2F2}
+\definecolor{darkgray}{HTML}{111827}
+\definecolor{midgray}{HTML}{4B5563}
+\usepackage{xurl}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\setlist[itemize]{leftmargin=1.2cm,itemsep=2pt,topsep=2pt}
+\setlist[enumerate]{leftmargin=1.2cm,itemsep=2pt,topsep=2pt}
+\renewcommand{\arraystretch}{1.18}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,shapes.misc,fit,calc}
+\usepackage[most]{tcolorbox}
+\usepackage{fvextra}
+\DefineVerbatimEnvironment{Code}{Verbatim}{fontsize=\small,breaklines=true,breakanywhere=true,frame=single,framesep=2mm,rulecolor=\color{gray!55}}
+\newtcolorbox{infobox}[1][]{breakable, colback=softblue, colframe=mainblue!50!black, boxrule=0.5pt, arc=2mm, left=1mm, right=1mm, top=1mm, bottom=1mm, #1}
+\newtcolorbox{warnbox}[1][]{breakable, colback=softorange, colframe=orange!70!black, boxrule=0.5pt, arc=2mm, left=1mm, right=1mm, top=1mm, bottom=1mm, #1}
+\newtcolorbox{redbox}[1][]{breakable, colback=softred, colframe=red!70!black, boxrule=0.5pt, arc=2mm, left=1mm, right=1mm, top=1mm, bottom=1mm, #1}
+\newtcolorbox{notebox}[1][]{breakable, colback=softblue, colframe=mainblue!50!black, #1, boxrule=0.5pt, arc=2mm, left=1mm, right=1mm, top=1mm, bottom=1mm}
+\newtcolorbox{keybox}[1][]{breakable, colback=softgreen, colframe=green!45!black, #1, boxrule=0.5pt, arc=2mm, left=1mm, right=1mm, top=1mm, bottom=1mm}
+\newtcolorbox{riskbox}[1][]{breakable, colback=softred, colframe=red!55!black, #1, boxrule=0.5pt, arc=2mm, left=1mm, right=1mm, top=1mm, bottom=1mm}
+\DeclareRobustCommand{\code}[1]{\begingroup\urlstyle{tt}\url{#1}\endgroup}
+\newcommand{\term}[1]{\textbf{#1}}
+\DeclareRobustCommand{\file}[1]{\code{#1}}
+\newcommand{\ra}{$\rightarrow$}
+\sloppy
+\usepackage{titlesec}
+\titlespacing*{\section}{0pt}{1.2em}{0.55em}
+\titlespacing*{\subsection}{0pt}{0.9em}{0.35em}
+\titlespacing*{\subsubsection}{0pt}{0.7em}{0.25em}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{1.6cm}
+    {\Huge\bfseries Kịch bản demo Phân hệ 2\\[0.35cm]}
+    \vspace{0.7cm}
+    {\Large Bảo mật dữ liệu y tế trên Oracle — chia việc cho 5 người\par}
+    \vspace{1.2cm}
+    \begin{infobox}
+    \textbf{Phạm vi:} Kịch bản trình diễn phủ \textbf{TC\#1} (ánh xạ tài khoản), \textbf{YC1} (RBAC + VPD),
+    \textbf{YC2} (OLS), \textbf{YC3} (Audit), \textbf{YC4} (Backup/Recovery) và \textbf{phần mở rộng mã hóa}
+    (NNE đường truyền, TDE at-rest, masking, đổi mật khẩu). Bám theo \file{DEMO_SCRIPT.md} và \file{TALKING_POINTS.md}.
+    \end{infobox}
+    \vfill
+    {\large Môn CSC12001 — An toàn \& Bảo mật Hệ thống Thông tin.\par}
+    \vspace{0.6cm}
+    {\large \today\par}
+\end{titlepage}
+
+\pagenumbering{roman}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+\section{Mục tiêu \& thông điệp xuyên suốt}
+
+Hệ thống là ứng dụng WinForms (.NET) kết nối Oracle. Đồ án không để ứng dụng tự quyết định quyền
+truy cập dữ liệu y tế; toàn bộ RBAC, VPD, OLS, Audit và trigger được thực thi tại Oracle Database
+Engine. Mỗi người trình bày một phần, nhưng tất cả nên nhắc lại cùng một thông điệp.
+
+\begin{keybox}[title={Thông điệp xuyên suốt (mọi người nhắc lại)}]
+Ranh giới bảo mật thật nằm ở \textbf{Database Engine} (RBAC + VPD + OLS + Audit). Ứng dụng là tầng
+phòng thủ bổ sung (defense-in-depth) + \textbf{mã hóa}: NNE bảo vệ \emph{đường truyền}, TDE bảo vệ
+\emph{dữ liệu at-rest}. Tức là đồ án có đủ \textbf{cả Access Control lẫn Cryptography}.
+\end{keybox}
+
+\begin{center}
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[font=\small,
+  wide/.style={rectangle,rounded corners,draw,align=center,minimum width=13.4cm,minimum height=0.95cm},
+  sub/.style={rectangle,rounded corners,draw=mainblue!60!black,fill=softblue,align=center,text width=2.7cm,minimum height=1.2cm,font=\footnotesize},
+  arrow/.style={-{Stealth[length=3mm]},very thick}]
+  \node[wide,fill=gray!10] (users) at (0,5.4) {\textbf{Người dùng}: ĐPV $\cdot$ Bác sĩ $\cdot$ KTV $\cdot$ Bệnh nhân $\cdot$ OLS (u1--u8) $\cdot$ DBA};
+  \node[wide,fill=softblue] (app) at (0,3.8) {\textbf{Tầng ứng dụng (HospitalApp)}: InputValidator $\cdot$ mask CCCD $\cdot$ OracleErrorMapper $\cdot$ khóa đăng nhập $\cdot$ đổi mật khẩu};
+  \node[rectangle,rounded corners,draw=red!60!black,fill=red!5,minimum width=13.4cm,minimum height=2.0cm] (db) at (0,1.15) {};
+  \node[font=\bfseries,text=red!55!black] at (0,1.95) {Oracle Database Engine — ranh giới bảo mật thật};
+  \node[sub] at (-4.9,0.75) {RBAC\\view + trigger\\(KTV, BN)};
+  \node[sub] at (-1.63,0.75) {VPD\\lọc dòng\\(ĐPV, BS)};
+  \node[sub] at (1.63,0.75) {OLS\\nhãn\\(THONGBAO)};
+  \node[sub] at (4.9,0.75) {Audit + FGA\\ghi vết};
+  \node[rectangle,rounded corners,draw=green!50!black,fill=green!8,align=center,text width=5.5cm,font=\footnotesize] (tde) at (0,-1.35) {\textbf{TDE} — mã hóa cột at-rest: CCCD, CMND, DIUNGTHUOC};
+  \draw[arrow] (users)--(app);
+  \draw[arrow] (app)--(db) node[midway,right,font=\footnotesize]{\;Oracle Net: NNE (AES256 + SHA512)};
+  \draw[arrow,green!50!black] (db)--(tde) node[midway,right,font=\footnotesize]{\;ghi xuống đĩa};
+\end{tikzpicture}}
+\end{center}
+
+\section{Phân công tổng quan}
+
+\begin{center}
+\resizebox{0.98\textwidth}{!}{%
+\begin{tikzpicture}[font=\footnotesize, node distance=0.55cm,
+  p/.style={rectangle,rounded corners,draw=mainblue!60!black,fill=softblue,align=center,text width=2.3cm,minimum height=1.5cm},
+  arrow/.style={-{Stealth[length=2.4mm]},thick}]
+  \node[p](a){\textbf{A}\\Mở đầu + Admin + TC\#1};
+  \node[p,right=of a](b){\textbf{B}\\RBAC:\\KTV + BN};
+  \node[p,right=of b](c){\textbf{C}\\VPD:\\ĐPV + BS};
+  \node[p,right=of c](d){\textbf{D}\\OLS + Audit};
+  \node[p,right=of d](e){\textbf{E}\\Backup/Recovery + Mã hóa};
+  \draw[arrow](a)--(b); \draw[arrow](b)--(c); \draw[arrow](c)--(d); \draw[arrow](d)--(e);
+\end{tikzpicture}}
+\end{center}
+
+\small
+\begin{longtable}{c c L{6.6cm} L{3.7cm} c}
+\toprule
+\textbf{STT} & \textbf{Người} & \textbf{Phần phụ trách} & \textbf{Tài khoản chính} & \textbf{Thời lượng} \\
+\midrule
+\endhead
+1 & \textbf{A} & Mở đầu + Kiến trúc + Phân hệ 1 (DBA) + \textbf{TC\#1} + Đổi mật khẩu & \code{SYSTEM} / \code{HOSPITAL_DBA} & 4 phút \\
+2 & \textbf{B} & \textbf{YC1 -- RBAC}: Kỹ thuật viên + Bệnh nhân (view + trigger) & \code{KTV_NV006}, \code{BN_BN001} & 4 phút \\
+3 & \textbf{C} & \textbf{YC1 -- VPD}: Điều phối viên + Bác sĩ & \code{DPV_NV001}, \code{BS_NV003} & 5 phút \\
+4 & \textbf{D} & \textbf{YC2 -- OLS} + \textbf{YC3 -- Audit} & \code{u4_nvtk_hcm}, DBA & 5 phút \\
+5 & \textbf{E} & \textbf{YC4 -- Backup/Recovery} + \textbf{Mã hóa (NNE + TDE)} + Kết luận & BVADMIN, DBA & 6 phút \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\begin{infobox}
+\textbf{Tài khoản dùng chung:} mật khẩu nhân viên/bệnh nhân = \code{BV@2025!}; OLS \code{u4_nvtk_hcm} = \code{U4@2025};
+DBA = \code{SYSTEM/oracle} hoặc \code{HOSPITAL_DBA/Hospital@DBA2025}; SYS = \code{<SYS_PASSWORD>} (tự điền).
+\end{infobox}
+
+\section{Chuẩn bị trước demo (checklist)}
+
+\small
+\begin{longtable}{L{13.2cm} c}
+\toprule
+\textbf{Việc cần chuẩn bị} & \textbf{Đã xong} \\
+\midrule
+\endhead
+DB đang chạy, đã chạy migration 01--12 + \code{setup_all} (\code{run_migrations.ps1} / \code{scripts/setup.ps1}). & $\square$ \\
+Đặt \code{NLS_LANG=.AL32UTF8} ở mọi cửa sổ PowerShell/sqlplus (tránh hỏng tiếng Việt). & $\square$ \\
+Đã chạy \code{13_TDE_Encryption.sql} + keystore \textbf{OPEN} (kiểm \code{V$ENCRYPTION_WALLET}). & $\square$ \\
+Đã bật \textbf{Native Network Encryption} trong \code{sqlnet.ora} (xem \file{SETUP_ENCRYPTION.md}). & $\square$ \\
+Build app: \code{dotnet run --project HospitalApp} (đóng bản cũ trước). & $\square$ \\
+Mở sẵn 2 cửa sổ: HospitalApp + SQL*Plus/SQL Developer (để chạy query DBA). & $\square$ \\
+Dữ liệu mẫu nguyên vẹn (\code{SELECT COUNT(*) FROM BVADMIN.HSBA_DV;} = 5). & $\square$ \\
+Đăng nhập thử trước 5 tài khoản để chắc không kẹt mật khẩu. & $\square$ \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\section{Người 1 (A) — Mở đầu + Kiến trúc + TC\#1 + Đổi mật khẩu}
+
+\textbf{Nói:} giới thiệu bài toán (bệnh viện đa cơ sở, dữ liệu nhạy cảm), nêu \textbf{thông điệp xuyên suốt}.
+
+\noindent\textbf{Demo:}
+\begin{enumerate}
+  \item \textbf{Phân hệ 1 -- AdminDashboard} (\code{SYSTEM/oracle} hoặc \code{HOSPITAL_DBA/Hospital@DBA2025}):
+    tạo user demo \code{TEST_USER}, tạo role, grant/revoke role + object/system privilege; xem lại
+    system / object / role privileges.
+  \item \textbf{TC\#1 -- ánh xạ tài khoản:} mỗi người dùng app = một Oracle account riêng (cột
+    \code{ORACLE_USER} trong \code{NHANVIEN}/\code{BENHNHAN}) \ra{} VPD/OLS tự áp theo \code{SESSION_USER}.
+    Đăng nhập 2 vai trò khác nhau để thấy giao diện đổi theo role.
+  \item \textbf{Đổi mật khẩu (self-service):} bấm nút \textbf{Đổi mật khẩu} ở header \ra{} nhập cũ/mới \ra{}
+    ``Vui lòng đăng nhập lại'' \ra{} đăng nhập bằng mật khẩu mới.
+\end{enumerate}
+
+\begin{notebox}[title={Nói khi demo đổi mật khẩu}]
+Dùng \code{ALTER USER ... IDENTIFIED BY ... REPLACE ...} — user tự đổi mật khẩu của chính mình
+\textbf{không cần quyền DBA}. Sau khi đổi, connection cũ giữ mật khẩu cũ nên app đăng xuất để đăng nhập lại.
+\end{notebox}
+
+\begin{warnbox}[title={Có thể bị hỏi}]
+\textit{``Brute-force tầng app khác gì DB profile?''} \ra{} App khóa sớm (5 lần sai/60s) trước khi gửi
+kết nối lỗi xuống DB; DB profile là lớp chặn cuối.
+\end{warnbox}
+
+\section{Người 2 (B) — YC1 RBAC: Kỹ thuật viên + Bệnh nhân}
+
+\textbf{Nói:} KTV và BN dùng \textbf{view + trigger} (RBAC) vì chỉ cần lọc theo 1 cột và giới hạn cột được sửa.
+
+\noindent\textbf{Demo KTV} (\code{KTV_NV006/BV@2025!}):
+\begin{enumerate}
+  \item View \code{KTV_HSBA_DV_View} chỉ trả dịch vụ có \code{MAKTV = NV006} (không thấy của KTV khác).
+  \item Cập nhật cột \textbf{KẾT QUẢ} \ra{} lưu thành công.
+  \item (SQL*Plus) thử \code{UPDATE} cột khác (vd \code{LOAIDV}) \ra{} trigger chặn \textbf{\code{ORA-20001}}.
+\end{enumerate}
+
+\noindent\textbf{Demo Bệnh nhân} (\code{BN_BN001/BV@2025!}):
+\begin{enumerate}
+  \item Chỉ xem được thông tin của chính mình (view \code{BN_BENHNHAN_View} lọc theo \code{ORACLE_USER}).
+  \item Sửa địa chỉ / tiền sử bệnh hợp lệ \ra{} lưu OK.
+  \item Thử sửa \textbf{CCCD} \ra{} INSTEAD OF trigger chặn \textbf{\code{ORA-20002}} (không đổi được định danh).
+  \item Chỉ ra \textbf{CCCD đang mask 4 số cuối} (\texttt{\textbullet\textbullet\textbullet\textbullet\textbullet\textbullet 5678}) — data minimization.
+\end{enumerate}
+
+\begin{warnbox}[title={Có thể bị hỏi}]
+\textit{``Vì sao KTV dùng RBAC/view thay VPD?''} \ra{} KTV chỉ lọc theo \code{MAKTV}; view + trigger là đủ,
+dễ kiểm soát cột update, dễ minh họa.
+\end{warnbox}
+
+\section{Người 3 (C) — YC1 VPD: Điều phối viên + Bác sĩ}
+
+\textbf{Nói:} ĐPV/BS truy cập \textbf{cùng} các bảng \code{HSBA}/\code{HSBA_DV}/\code{DONTHUOC} nên dùng
+\textbf{VPD} — Oracle tự chèn WHERE predicate vào mọi câu SQL, an toàn kể cả truy vấn trực tiếp.
+
+\noindent\textbf{Demo Điều phối viên} (\code{DPV_NV001/BV@2025!}):
+\begin{enumerate}
+  \item \textbf{Thêm bệnh nhân mới} \ra{} app gọi \code{sp_create_benhnhan_full}: tự sinh MÃBN + tự tạo
+    tài khoản \code{BN_<MABN>} (TC\#1). Báo lại mã + tài khoản đăng nhập.
+  \item Tạo \textbf{HSBA} (mã sinh bằng sequence \code{fn_next_mahsba}), gán bác sĩ + gán KTV cho dịch vụ.
+  \item Tab \textbf{Thông tin của tôi}: sửa quê quán / SĐT.
+  \item Ô \textbf{CCCD}: mặc định mask, bấm \textbf{nút con mắt} để lộ đầy đủ khi đối chiếu (chỉ ĐPV mới có).
+\end{enumerate}
+
+\noindent\textbf{Demo Bác sĩ} (\code{BS_NV003/BV@2025!}):
+\begin{enumerate}
+  \item \textbf{VPD trên \code{HSBA}}: chỉ thấy hồ sơ có \code{MABS = NV003} (không thấy của BS khác).
+  \item Cập nhật chẩn đoán/điều trị/kết luận \ra{} trigger ghi \code{LOG_BS_HSBA} (giá trị cũ/mới).
+  \item Thêm dịch vụ chẩn đoán, chọn KTV; thêm/sửa đơn thuốc \ra{} \textbf{FGA + trigger} ghi vết.
+  \item (tùy) cập nhật tiền sử/dị ứng của BN mình điều trị (TC\#3d) — column-grant.
+\end{enumerate}
+
+\begin{warnbox}[title={Có thể bị hỏi}]
+\textit{``\code{update_check=>TRUE} để làm gì?''} \ra{} sau update, Oracle kiểm lại policy, chặn việc sửa
+khóa-lọc để đẩy dữ liệu sang phạm vi khác. (Bài này để FALSE để tránh \code{ORA-28138} khi INSERT qua
+INSTEAD OF — giải thích được nếu bị hỏi.)
+\end{warnbox}
+
+\section{Người 4 (D) — YC2 OLS + YC3 Audit}
+
+\noindent\textbf{Demo OLS} (\code{u4_nvtk_hcm/U4@2025}):
+\begin{enumerate}
+  \item Mở \textbf{OLSViewerForm}, nhãn người dùng = \textbf{\code{NV:HCM:TK}}.
+  \item Chỉ thấy thông báo có nhãn phù hợp, không thấy thông báo cấp cao hơn.
+  \item (đối chứng) đăng nhập \code{u1_giamdoc} (cấp \textbf{BGD}) \ra{} thấy nhiều thông báo hơn.
+  \item \textbf{Nói:} chính sách \code{BV_LABEL_POLICY} = \textbf{level} \code{NV < LDK < BGD} + \textbf{compartment}
+    \code{HCM/HPN/HNI} + \textbf{group} \code{TH/TK/TM}.
+\end{enumerate}
+
+\noindent\textbf{Demo Audit} (DBA / SQL*Plus):
+\begin{Code}
+SELECT USERNAME, ACTION_NAME, OBJ_NAME, TIMESTAMP
+FROM DBA_AUDIT_TRAIL ORDER BY TIMESTAMP DESC FETCH FIRST 20 ROWS ONLY;
+
+SELECT DB_USER, OBJECT_NAME, POLICY_NAME, SQL_TEXT, EXTENDED_TIMESTAMP
+FROM DBA_FGA_AUDIT_TRAIL ORDER BY EXTENDED_TIMESTAMP DESC FETCH FIRST 20 ROWS ONLY;
+\end{Code}
+\begin{itemize}
+  \item Chỉ ra dòng audit ứng với thao tác Người 3 vừa làm (sửa chẩn đoán, thêm đơn thuốc).
+  \item Mở bảng log nghiệp vụ: \code{LOG_BS_HSBA}, \code{LOG_BS_DONTHUOC}, \code{LOG_KTV_KETQUA}.
+\end{itemize}
+
+\begin{warnbox}[title={Có thể bị hỏi}]
+\textit{``compartment vs group khác gì?''} \ra{} compartment nghĩa \textbf{AND} (phải có đủ); group nghĩa
+\textbf{OR} và có \textbf{phân cấp}.
+\end{warnbox}
+
+\section{Người 5 (E) — YC4 Backup/Recovery + Mã hóa + Kết luận}
+
+\subsection{YC4 -- Flashback recovery (chính, trực quan)}
+\begin{Code}
+$env:NLS_LANG = ".AL32UTF8"
+sqlplus /nolog "@d:\repos\Oracle\PhanHe2\extras\recovery_demo.sql"
+\end{Code}
+Chỉ ra 3 mốc: \code{HSBA_DV} = \textbf{5} \ra{} xóa nhầm HS001 còn \textbf{4} \ra{} \textbf{FLASHBACK TABLE}
+về \textbf{5} $\checkmark$. So sánh 3 phương pháp (xem \code{07_YC4_Backup_Recovery.sql} phần D): \textbf{RMAN}
+(vật lý, toàn vẹn cao) $\cdot$ \textbf{Data Pump} (logic, di động) $\cdot$ \textbf{Flashback} (phục hồi cực nhanh
+lỗi người dùng). RMAN/Data Pump cho xem lệnh + log; Flashback demo trực tiếp.
+
+\subsection{Mã hóa đường truyền (NNE)}
+\begin{Code}
+SELECT NETWORK_SERVICE_BANNER
+FROM   V$SESSION_CONNECT_INFO
+WHERE  SID = SYS_CONTEXT('USERENV','SID');
+\end{Code}
+Chỉ ra dòng có \textbf{AES256} + \textbf{SHA} \ra{} kết nối TCP đã mã hóa (cấu hình \code{sqlnet.ora},
+\code{ENCRYPTION_SERVER=REQUIRED}).
+
+\subsection{Mã hóa cột at-rest (TDE)}
+\begin{Code}
+SELECT TABLE_NAME, COLUMN_NAME, ENCRYPTION_ALG
+FROM   DBA_ENCRYPTED_COLUMNS ORDER BY TABLE_NAME, COLUMN_NAME;
+\end{Code}
+\code{CCCD}, \code{CMND} (NO SALT \ra{} giữ UNIQUE), \code{DIUNGTHUOC} (có salt) — \textbf{AES}. App vẫn đọc
+plaintext (giải mã trong suốt); trên đĩa là ciphertext.
+
+\begin{keybox}[title={Kết luận}]
+Đồ án phủ \textbf{Access Control} (RBAC + VPD + OLS) + \textbf{Audit} + \textbf{Backup/Recovery} +
+\textbf{Cryptography} (NNE đường truyền, TDE at-rest, masking) — bảo vệ dữ liệu y tế nhạy cảm nhiều tầng.
+\end{keybox}
+
+\begin{warnbox}[title={Có thể bị hỏi}]
+\textit{``Vì sao cần Oracle Net encryption khi đã có RBAC/VPD?''} \ra{} RBAC/VPD/OLS bảo vệ \emph{bên trong}
+database; NNE bảo vệ dữ liệu \emph{trên đường truyền} TCP. \quad \textit{``TDE có chặn ĐPV xem CCCD không?''}
+\ra{} KHÔNG — TDE trong suốt với phiên hợp lệ; chặn xem là việc của access control/masking.
+\end{warnbox}
+
+\section{Luồng thời gian \& lưu ý}
+
+Thứ tự: A (4') \ra{} B (4') \ra{} C (5') \ra{} D (5') \ra{} E (6'), tổng khoảng 24 phút + Q\&A. Mỗi người tự
+kết nối tài khoản của mình; chuẩn bị sẵn cửa sổ để chuyển mượt.
+
+\begin{riskbox}[title={Nếu thiếu thời gian}]
+Rút gọn phần RMAN/Data Pump của Người 5 (chỉ nói, không chạy), giữ \textbf{Flashback + TDE + NNE} vì đây
+là 3 minh chứng trực quan nhất cho phần mã hóa và phục hồi.
+\end{riskbox}
+
+\end{document}

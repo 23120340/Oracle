@@ -165,7 +165,12 @@ BEGIN
         policy_name   => 'BV_LABEL_POLICY',
         schema_name   => 'BVADMIN',
         table_name    => 'THONGBAO',
-        table_options => 'READ_CONTROL',     -- chỉ kiểm soát READ
+        -- Chỉ READ_CONTROL (kiểm soát ĐỌC theo nhãn).
+        -- KHÔNG dùng LABEL_DEFAULT: BVADMIN có quyền FULL (BƯỚC 8a) nên OLS BỎ QUA việc
+        --   tự gán nhãn khi user FULL insert ⇒ SET_ROW_LABEL/LABEL_DEFAULT đều VÔ HIỆU,
+        --   cột OLS_LABEL sẽ NULL ⇒ u1–u8 đọc 0 dòng. (Đã kiểm chứng trên Oracle 21c XE.)
+        --   Vì vậy BƯỚC 8b gán nhãn TRỰC TIẾP bằng CHAR_TO_LABEL.
+        table_options => 'READ_CONTROL',
         label_function => NULL,
         predicate      => NULL
     );
@@ -221,59 +226,41 @@ BEGIN
 END;
 /
 
--- 8b. Chèn thông báo kèm nhãn OLS (SET_ROW_LABEL + INSERT trong CÙNG block)
+-- 8b. Chèn thông báo, gán nhãn OLS TRỰC TIẾP bằng CHAR_TO_LABEL.
+--     KHÔNG dùng SA_SESSION.SET_ROW_LABEL: BVADMIN có quyền FULL nên OLS không tự gán
+--     nhãn dòng (xem ghi chú BƯỚC 6) ⇒ phải ghi thẳng giá trị nhãn vào cột OLS_LABEL.
 CONNECT BVADMIN/"BVAdmin@2025";
 
-BEGIN  -- t1: gửi toàn bộ nhân viên (NV)
-  SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'NV');
-  INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
-  VALUES('TB001', N'Thông báo họp toàn viện ngày 05/05/2025', SYSTIMESTAMP, N'Hội trường lớn');
-END;
-/
-BEGIN  -- t2: Ban giám đốc (BGD)
-  SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'BGD');
-  INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
-  VALUES('TB002', N'Họp khẩn Ban Giám đốc - Kế hoạch mở rộng 2025', SYSTIMESTAMP, N'Phòng họp BGD');
-END;
-/
-BEGIN  -- t3: các lãnh đạo khoa (LDK)
-  SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'LDK');
-  INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
-  VALUES('TB003', N'Họp lãnh đạo khoa - Báo cáo quý 2', SYSTIMESTAMP, N'Phòng họp A');
-END;
-/
-BEGIN  -- t4: lãnh đạo Khoa Tiêu hóa (LDK::TH)
-  SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'LDK::TH');
-  INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
-  VALUES('TB004', N'Họp lãnh đạo Khoa Tiêu hóa - Cải tiến quy trình', SYSTIMESTAMP, N'Phòng D2.01');
-END;
-/
-BEGIN  -- t5: NV Khoa Tiêu hóa @HCM (NV:HCM:TH)
-  SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'NV:HCM:TH');
-  INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
-  VALUES('TB005', N'Tập huấn nội soi tiêu hóa - Cơ sở HCM', SYSTIMESTAMP, N'Phòng kỹ năng HCM');
-END;
-/
-BEGIN  -- t6: NV Khoa Tiêu hóa @Hà Nội (NV:HNI:TH)
-  SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'NV:HNI:TH');
-  INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
-  VALUES('TB006', N'Tập huấn nội soi tiêu hóa - Cơ sở Hà Nội', SYSTIMESTAMP, N'Phòng kỹ năng HN');
-END;
-/
-BEGIN  -- t7: LĐ Khoa TH và TK @Hải Phòng (LDK:HPN:TH,TK)
-  SA_SESSION.SET_ROW_LABEL('BV_LABEL_POLICY', 'LDK:HPN:TH,TK');
-  INSERT INTO THONGBAO(MATB, NOIDUNG, NGAYGIO, DIADIEM)
-  VALUES('TB007', N'Họp khẩn Lãnh đạo Khoa TH và TK - Cơ sở Hải Phòng', SYSTIMESTAMP, N'Phòng họp HP');
-END;
-/
+-- t1: gửi toàn bộ nhân viên (NV)
+INSERT INTO THONGBAO(MATB, OLS_LABEL, NOIDUNG, NGAYGIO, DIADIEM)
+VALUES('TB001', CHAR_TO_LABEL('BV_LABEL_POLICY','NV'),
+       N'Thông báo họp toàn viện ngày 05/05/2025', SYSTIMESTAMP, N'Hội trường lớn');
+-- t2: Ban giám đốc (BGD)
+INSERT INTO THONGBAO(MATB, OLS_LABEL, NOIDUNG, NGAYGIO, DIADIEM)
+VALUES('TB002', CHAR_TO_LABEL('BV_LABEL_POLICY','BGD'),
+       N'Họp khẩn Ban Giám đốc - Kế hoạch mở rộng 2025', SYSTIMESTAMP, N'Phòng họp BGD');
+-- t3: các lãnh đạo khoa (LDK)
+INSERT INTO THONGBAO(MATB, OLS_LABEL, NOIDUNG, NGAYGIO, DIADIEM)
+VALUES('TB003', CHAR_TO_LABEL('BV_LABEL_POLICY','LDK'),
+       N'Họp lãnh đạo khoa - Báo cáo quý 2', SYSTIMESTAMP, N'Phòng họp A');
+-- t4: lãnh đạo Khoa Tiêu hóa (LDK::TH)
+INSERT INTO THONGBAO(MATB, OLS_LABEL, NOIDUNG, NGAYGIO, DIADIEM)
+VALUES('TB004', CHAR_TO_LABEL('BV_LABEL_POLICY','LDK::TH'),
+       N'Họp lãnh đạo Khoa Tiêu hóa - Cải tiến quy trình', SYSTIMESTAMP, N'Phòng D2.01');
+-- t5: NV Khoa Tiêu hóa @HCM (NV:HCM:TH)
+INSERT INTO THONGBAO(MATB, OLS_LABEL, NOIDUNG, NGAYGIO, DIADIEM)
+VALUES('TB005', CHAR_TO_LABEL('BV_LABEL_POLICY','NV:HCM:TH'),
+       N'Tập huấn nội soi tiêu hóa - Cơ sở HCM', SYSTIMESTAMP, N'Phòng kỹ năng HCM');
+-- t6: NV Khoa Tiêu hóa @Hà Nội (NV:HNI:TH)
+INSERT INTO THONGBAO(MATB, OLS_LABEL, NOIDUNG, NGAYGIO, DIADIEM)
+VALUES('TB006', CHAR_TO_LABEL('BV_LABEL_POLICY','NV:HNI:TH'),
+       N'Tập huấn nội soi tiêu hóa - Cơ sở Hà Nội', SYSTIMESTAMP, N'Phòng kỹ năng HN');
+-- t7: LĐ Khoa TH và TK @Hải Phòng (LDK:HPN:TH,TK)
+INSERT INTO THONGBAO(MATB, OLS_LABEL, NOIDUNG, NGAYGIO, DIADIEM)
+VALUES('TB007', CHAR_TO_LABEL('BV_LABEL_POLICY','LDK:HPN:TH,TK'),
+       N'Họp khẩn Lãnh đạo Khoa TH và TK - Cơ sở Hải Phòng', SYSTIMESTAMP, N'Phòng họp HP');
 
 COMMIT;
-
--- Khôi phục session label về mặc định
-BEGIN
-  SA_SESSION.RESTORE_DEFAULT_LABELS('BV_LABEL_POLICY');
-END;
-/
 
 -- ============================================================
 -- BƯỚC 9: Kiểm thử - mỗi user thấy thông báo nào?
